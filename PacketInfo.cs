@@ -1,15 +1,52 @@
 ﻿using System;
 
-public class PacketInfo
+namespace PacketSnifferWPF
 {
-	public PacketInfo()
-	{
-	}
-    public string Timestamp { get; set; }
-    public string Type { get; set; }           // original human-readable type (e.g., "HTTP Request (...)")
-    public string Protocol { get; set; }       // short protocol: "TCP", "UDP", "HTTP", etc.
-    public string Source { get; set; }
-    public string Destination { get; set; }
-    public string CapturedData { get; set; }   // info package / preview text
-    public bool HasPayload { get; set; }       // true if a decoded payload exists (non-empty)
+    /// <summary>
+    /// Represents information about a captured network packet.
+    /// </summary>
+    public class PacketInfo
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PacketInfo"/> class.
+        /// </summary>
+        public PacketInfo()
+        {
+        }
+
+        /// <summary>
+        /// Gets or sets the timestamp of when the packet was captured.
+        /// </summary>
+        public string Timestamp { get; set; }
+
+        /// <summary>
+        /// Gets or sets the detailed type of the packet (e.g., "HTTP Request (GET /index.html HTTP/1.1)").
+        /// </summary>
+        public string Type { get; set; }
+
+        /// <summary>
+        /// Gets or sets the short protocol name (e.g., "TCP", "UDP", "HTTP").
+        /// </summary>
+        public string Protocol { get; set; }
+
+        /// <summary>
+        /// Gets or sets the source address and port (e.g., "127.0.0.1:12345").
+        /// </summary>
+        public string Source { get; set; }
+
+        /// <summary>
+        /// Gets or sets the destination address and port (e.g., "127.0.0.1:80").
+        /// </summary>
+        public string Destination { get; set; }
+
+        /// <summary>
+        /// Gets or sets a summary of the captured packet data.
+        /// </summary>
+        public string CapturedData { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the packet has a non-empty payload.
+        /// </summary>
+        public bool HasPayload { get; set; }
+    }
 }

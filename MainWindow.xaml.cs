@@ -13,11 +13,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;   // <-- added
+using System.Windows.Data;
 using System.Windows.Threading;
 
 namespace PacketSnifferWPF
 {
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
     public partial class MainWindow : Window
     {
         private ObservableCollection<PacketInfo> _packets = new ObservableCollection<PacketInfo>();
@@ -30,6 +33,10 @@ namespace PacketSnifferWPF
         private CancellationTokenSource _cancellationTokenSource;
         private bool _monitorAllPorts;
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MainWindow"/> class.
+        /// Sets up the UI, data bindings, and event handlers.
+        /// </summary>
         public MainWindow()
         {
             InitializeComponent();
@@ -52,17 +59,31 @@ namespace PacketSnifferWPF
             LoadInterfaces();
         }
 
-        // call this when any filter control changes
+        /// <summary>
+        /// Handles changes to filter controls, refreshing the packet view.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void FilterControlChanged(object sender, RoutedEventArgs e)
         {
             _packetsView?.Refresh();
         }
 
+        /// <summary>
+        /// Handles changes to the protocol filter ComboBox, refreshing the packet view.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="SelectionChangedEventArgs"/> instance containing the event data.</param>
         private void FilterControlChanged(object sender, SelectionChangedEventArgs e)
         {
             _packetsView?.Refresh();
         }
 
+        /// <summary>
+        /// Filters packets for display based on protocol and payload settings.
+        /// </summary>
+        /// <param name="obj">The packet object to evaluate.</param>
+        /// <returns>True if the packet passes the filter; otherwise, false.</returns>
         private bool PacketFilter(object obj)
         {
             if (obj is PacketInfo p)
@@ -84,6 +105,11 @@ namespace PacketSnifferWPF
             return false;
         }
 
+        /// <summary>
+        /// Handles changes to the PortsModeComboBox, enabling/disabling the custom ports input.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="SelectionChangedEventArgs"/> instance containing the event data.</param>
         private void PortsModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PortsModeComboBox.SelectedItem != null)
@@ -92,6 +118,9 @@ namespace PacketSnifferWPF
             }
         }
 
+        /// <summary>
+        /// Loads available loopback network interfaces into the InterfaceComboBox.
+        /// </summary>
         private void LoadInterfaces()
         {
             var devices = CaptureDeviceList.Instance;
@@ -116,6 +145,11 @@ namespace PacketSnifferWPF
             InterfaceComboBox.SelectedIndex = 0; // Default to the first (and likely only) loopback interface
         }
 
+        /// <summary>
+        /// Starts packet sniffing when the Start button is clicked.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
             if (InterfaceComboBox.SelectedItem == null)
@@ -173,6 +207,11 @@ namespace PacketSnifferWPF
             StopButton.IsEnabled = true;
         }
 
+        /// <summary>
+        /// Stops packet sniffing and closes log files when the Stop button is clicked.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
             _cancellationTokenSource?.Cancel();
@@ -182,6 +221,12 @@ namespace PacketSnifferWPF
             StopButton.IsEnabled = false;
         }
 
+        /// <summary>
+        /// Parses the ports argument to determine which ports to monitor.
+        /// </summary>
+        /// <param name="portsArg">The ports mode or custom port list.</param>
+        /// <returns>A tuple containing the list of ports and a boolean indicating if all ports are monitored.</returns>
+        /// <exception cref="ArgumentException">Thrown if the ports format is invalid.</exception>
         private (List<int>, bool) ParsePorts(string portsArg)
         {
             if (portsArg.Equals("all", StringComparison.OrdinalIgnoreCase))
@@ -204,6 +249,11 @@ namespace PacketSnifferWPF
             }
         }
 
+        /// <summary>
+        /// Starts the packet sniffing process on the specified device.
+        /// </summary>
+        /// <param name="device">The capture device to use.</param>
+        /// <param name="token">The cancellation token to stop sniffing.</param>
         private void StartSniffing(ICaptureDevice device, CancellationToken token)
         {
             // Ensure we only attach the handler once
@@ -300,6 +350,11 @@ namespace PacketSnifferWPF
             }
         }
 
+        /// <summary>
+        /// Handles packet arrival events, parsing and processing packets.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="PacketCapture"/> instance containing the packet data.</param>
         private void Device_OnPacketArrival(object sender, PacketCapture e)
         {
             try
@@ -379,6 +434,11 @@ namespace PacketSnifferWPF
             }
         }
 
+        /// <summary>
+        /// Detects if the payload contains HTTP data and returns an appropriate label.
+        /// </summary>
+        /// <param name="payload">The packet payload to analyze.</param>
+        /// <returns>An HTTP-specific label or null if not HTTP.</returns>
         private string DetectHttpLabel(string payload)
         {
             if (string.IsNullOrEmpty(payload)) return null;
@@ -399,6 +459,12 @@ namespace PacketSnifferWPF
             return null;
         }
 
+        /// <summary>
+        /// Extracts a summary of the packet payload for display and logging.
+        /// </summary>
+        /// <param name="protocolLabel">The protocol label of the packet.</param>
+        /// <param name="decodedPayload">The decoded packet payload.</param>
+        /// <returns>A string summarizing the packet data.</returns>
         private string GetInformationPackage(string protocolLabel, string decodedPayload)
         {
             if (string.IsNullOrEmpty(decodedPayload)) return "No payload";
@@ -446,6 +512,16 @@ namespace PacketSnifferWPF
             }
         }
 
+        /// <summary>
+        /// Processes a captured packet, updating the UI and logs.
+        /// </summary>
+        /// <param name="srcIp">Source IP address.</param>
+        /// <param name="srcPort">Source port.</param>
+        /// <param name="dstIp">Destination IP address.</param>
+        /// <param name="dstPort">Destination port.</param>
+        /// <param name="decodedPayload">Decoded packet payload.</param>
+        /// <param name="protocolLabel">Protocol label.</param>
+        /// <param name="packet">The parsed packet object.</param>
         private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string decodedPayload, string protocolLabel, PacketDotNet.Packet packet)
         {
             string infoPkg = GetInformationPackage(protocolLabel, decodedPayload);
