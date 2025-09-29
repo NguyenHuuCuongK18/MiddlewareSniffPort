@@ -1,8 +1,10 @@
-﻿using PacketDotNet;
+﻿// MainWindow.xaml.cs
+using PacketDotNet;
 using SharpPcap;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -10,6 +12,8 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;   // <-- added
 using System.Windows.Threading;
 
 namespace PacketSnifferWPF
@@ -17,6 +21,7 @@ namespace PacketSnifferWPF
     public partial class MainWindow : Window
     {
         private ObservableCollection<PacketInfo> _packets = new ObservableCollection<PacketInfo>();
+        private ICollectionView _packetsView; // view with filter
         private ICaptureDevice _device;
         private List<int> _monitoredPorts;
         private bool _debugMode;
@@ -28,8 +33,63 @@ namespace PacketSnifferWPF
         public MainWindow()
         {
             InitializeComponent();
+
+            // set items source and build collection view for filtering
             PacketsDataGrid.ItemsSource = _packets;
+            _packetsView = CollectionViewSource.GetDefaultView(_packets);
+            _packetsView.Filter = PacketFilter;
+
+            // Set up ports mode ComboBox
+            PortsModeComboBox.ItemsSource = new List<string> { "all", "common", "targeted", "custom" };
+            PortsModeComboBox.SelectedIndex = 2; // Default to "targeted"
+            PortsModeComboBox.SelectionChanged += PortsModeComboBox_SelectionChanged;
+
+            // Hook up protocol filter initial event (in case user changes later)
+            ProtocolFilterComboBox.SelectionChanged += FilterControlChanged;
+            OnlyWithPayloadCheckBox.Checked += FilterControlChanged;
+            OnlyWithPayloadCheckBox.Unchecked += FilterControlChanged;
+
             LoadInterfaces();
+        }
+
+        // call this when any filter control changes
+        private void FilterControlChanged(object sender, RoutedEventArgs e)
+        {
+            _packetsView?.Refresh();
+        }
+
+        private void FilterControlChanged(object sender, SelectionChangedEventArgs e)
+        {
+            _packetsView?.Refresh();
+        }
+
+        private bool PacketFilter(object obj)
+        {
+            if (obj is PacketInfo p)
+            {
+                // payload filter
+                if (OnlyWithPayloadCheckBox.IsChecked == true && !p.HasPayload)
+                    return false;
+
+                // protocol filter
+                var selected = (ProtocolFilterComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "All";
+                if (!string.Equals(selected, "All", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (!string.Equals(p.Protocol, selected, StringComparison.OrdinalIgnoreCase))
+                        return false;
+                }
+
+                return true;
+            }
+            return false;
+        }
+
+        private void PortsModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (PortsModeComboBox.SelectedItem != null)
+            {
+                CustomPortsTextBox.IsEnabled = PortsModeComboBox.SelectedItem.ToString() == "custom";
+            }
         }
 
         private void LoadInterfaces()
@@ -41,10 +101,19 @@ namespace PacketSnifferWPF
                 return;
             }
 
-            InterfaceComboBox.ItemsSource = devices.Select(d => d.Description).ToList();
-            // Default to loopback if available
-            var loopbackIndex = devices.ToList().FindIndex(d => d.Description.Contains("Loopback") || d.Name.Contains("lo"));
-            InterfaceComboBox.SelectedIndex = loopbackIndex >= 0 ? loopbackIndex : 0;
+            // Filter to only loopback interfaces (matches "Adapter for loopback traffic capture" or "Npcap Loopback Adapter")
+            var loopbackDevices = devices.Where(d =>
+                d.Description.Contains("loopback", StringComparison.OrdinalIgnoreCase) ||
+                d.Name.Contains("lo", StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (loopbackDevices.Count == 0)
+            {
+                MessageBox.Show("No loopback interface found! Ensure Npcap is installed with loopback support and run as admin.");
+                return;
+            }
+
+            InterfaceComboBox.ItemsSource = loopbackDevices.Select(d => d.Description).ToList();
+            InterfaceComboBox.SelectedIndex = 0; // Default to the first (and likely only) loopback interface
         }
 
         private void StartButton_Click(object sender, RoutedEventArgs e)
@@ -55,10 +124,22 @@ namespace PacketSnifferWPF
                 return;
             }
 
+            // Get ports arg from new controls
+            string portsArg = PortsModeComboBox.SelectedItem.ToString();
+            if (portsArg == "custom")
+            {
+                portsArg = CustomPortsTextBox.Text.Trim();
+                if (string.IsNullOrEmpty(portsArg))
+                {
+                    MessageBox.Show("Enter comma-separated ports for custom mode.");
+                    return;
+                }
+            }
+
             // Parse ports
             try
             {
-                (_monitoredPorts, _monitorAllPorts) = ParsePorts(PortsTextBox.Text);
+                (_monitoredPorts, _monitorAllPorts) = ParsePorts(portsArg);
             }
             catch (Exception ex)
             {
@@ -67,7 +148,10 @@ namespace PacketSnifferWPF
             }
 
             _debugMode = DebugCheckBox.IsChecked ?? false;
-            var selectedInterface = CaptureDeviceList.Instance[InterfaceComboBox.SelectedIndex];
+            var selectedIndex = InterfaceComboBox.SelectedIndex;
+            var selectedInterface = CaptureDeviceList.Instance.Where(d =>
+                d.Description.Contains("loopback", StringComparison.OrdinalIgnoreCase) ||
+                d.Name.Contains("lo", StringComparison.OrdinalIgnoreCase)).ToList()[selectedIndex]; // Retrieve based on filtered list
 
             // Open log files
             try
@@ -216,7 +300,6 @@ namespace PacketSnifferWPF
             }
         }
 
-
         private void Device_OnPacketArrival(object sender, PacketCapture e)
         {
             try
@@ -296,7 +379,6 @@ namespace PacketSnifferWPF
             }
         }
 
-
         private string DetectHttpLabel(string payload)
         {
             if (string.IsNullOrEmpty(payload)) return null;
@@ -372,6 +454,28 @@ namespace PacketSnifferWPF
             string destination = $"{dstIp}:{dstPort}";
             string simpleLine = $"[{timestamp}]: [{protocolLabel}] detected from [{source}] to [{destination}]: {infoPkg}";
 
+            // Determine short protocol for filtering
+            string shortProtocol = "Unknown";
+            if (!string.IsNullOrEmpty(protocolLabel))
+            {
+                if (protocolLabel.StartsWith("HTTP", StringComparison.OrdinalIgnoreCase))
+                    shortProtocol = "HTTP";
+                else if (protocolLabel.StartsWith("TCP", StringComparison.OrdinalIgnoreCase))
+                    shortProtocol = "TCP";
+                else if (protocolLabel.StartsWith("UDP", StringComparison.OrdinalIgnoreCase))
+                    shortProtocol = "UDP";
+                else
+                {
+                    // fallback: try contains
+                    if (protocolLabel.IndexOf("tcp", StringComparison.OrdinalIgnoreCase) >= 0) shortProtocol = "TCP";
+                    else if (protocolLabel.IndexOf("udp", StringComparison.OrdinalIgnoreCase) >= 0) shortProtocol = "UDP";
+                    else if (protocolLabel.IndexOf("http", StringComparison.OrdinalIgnoreCase) >= 0) shortProtocol = "HTTP";
+                    else shortProtocol = protocolLabel;
+                }
+            }
+
+            bool hasPayload = !string.IsNullOrEmpty(decodedPayload);
+
             // Add to DataGrid (UI thread)
             Dispatcher.Invoke(() =>
             {
@@ -379,10 +483,15 @@ namespace PacketSnifferWPF
                 {
                     Timestamp = timestamp,
                     Type = protocolLabel,
+                    Protocol = shortProtocol,
                     Source = source,
                     Destination = destination,
-                    CapturedData = infoPkg
+                    CapturedData = infoPkg,
+                    HasPayload = hasPayload
                 });
+
+                // Apply filter refresh immediately so UI updates filtered list promptly
+                _packetsView?.Refresh();
             });
 
             // Log to simple file

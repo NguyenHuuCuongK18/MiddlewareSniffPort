@@ -3,16 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|c:\\users\\pc\\documents\\school\\net\\middlewaretest\\packetinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|solutionrelative:packetinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|c:\\users\\pc\\documents\\school\\net\\middlewaretest\\mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|solutionrelative:mainwindow.xaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|c:\\users\\pc\\documents\\school\\net\\middlewaretest\\mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}",
       "RelativeMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|solutionrelative:mainwindow.xaml||{F11ACC28-31D1-4C80-A34B-F4E09D3D753C}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|c:\\users\\pc\\documents\\school\\net\\middlewaretest\\packetinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|solutionrelative:packetinfo.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{92B05074-DA64-46FD-B3CF-164813E31F73}|MiddlewareTest.csproj|c:\\users\\pc\\documents\\school\\net\\middlewaretest\\app.manifest||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
@@ -30,7 +30,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 207,
+          "SelectedChildIndex": 211,
           "Children": [
             {
               "$type": "Bookmark",
@@ -862,13 +862,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 0,
+              "DocumentIndex": 2,
               "Title": "PacketInfo.cs",
               "DocumentMoniker": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\PacketInfo.cs",
               "RelativeDocumentMoniker": "PacketInfo.cs",
               "ToolTip": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\PacketInfo.cs",
               "RelativeToolTip": "PacketInfo.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAwAAAAEAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA4AAAABAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-09-29T05:56:42.1Z",
               "EditorCaption": ""
@@ -881,7 +881,7 @@
               "RelativeDocumentMoniker": "app.manifest",
               "ToolTip": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\app.manifest",
               "RelativeToolTip": "app.manifest",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAABQAAABLAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAAALAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001203|",
               "WhenOpened": "2025-09-29T05:52:08.333Z",
               "EditorCaption": ""
@@ -896,12 +896,11 @@
               "RelativeToolTip": "AssemblyInfo.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-09-29T05:46:48.406Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-29T05:46:48.406Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "MainWindow.xaml",
               "DocumentMoniker": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MainWindow.xaml",
               "RelativeDocumentMoniker": "MainWindow.xaml",
@@ -913,13 +912,13 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 0,
               "Title": "MainWindow.xaml.cs",
               "DocumentMoniker": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MainWindow.xaml.cs",
               "RelativeDocumentMoniker": "MainWindow.xaml.cs",
-              "ToolTip": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MainWindow.xaml.cs",
-              "RelativeToolTip": "MainWindow.xaml.cs",
-              "ViewState": "AgIAAAEBAAAAAAAAAADwvzIBAAABAAAAAAAAAA==",
+              "ToolTip": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MainWindow.xaml.cs*",
+              "RelativeToolTip": "MainWindow.xaml.cs*",
+              "ViewState": "AgIAAAsAAAAAAAAAAAAjwBEAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-09-29T05:38:55.691Z",
               "EditorCaption": ""

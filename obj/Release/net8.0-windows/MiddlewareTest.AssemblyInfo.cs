@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MiddlewareTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+dac9a881fb666cd5f6bc2c4fcb8f1e3116f2d1be")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3d60a7a2bc25d908fdf04f2e71dc19114eb780a4")]
 [assembly: System.Reflection.AssemblyProductAttribute("MiddlewareTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MiddlewareTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

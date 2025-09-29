@@ -1,7 +1,10 @@
 ﻿<Window x:Class="PacketSnifferWPF.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Packet Sniffer" Height="600" Width="1000">
+        Title="Packet Sniffer" 
+        Height="600" 
+        Width="1000"
+        WindowState="Maximized">
     <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -10,23 +13,44 @@
         </Grid.RowDefinitions>
 
         <!-- Controls Row -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Label Content="Interface:" Width="80"/>
-            <ComboBox x:Name="InterfaceComboBox" Width="200" Margin="5"/>
-            <Label Content="Ports (comma-separated, 'all', 'common', or 'targeted'):" Width="250"/>
-            <TextBox x:Name="PortsTextBox" Width="150" Margin="5" Text="targeted"/>
-            <Button x:Name="StartButton" Content="Start Sniffing" Width="120" Margin="5" Click="StartButton_Click"/>
-            <Button x:Name="StopButton" Content="Stop Sniffing" Width="120" Margin="5" Click="StopButton_Click" IsEnabled="False"/>
-            <CheckBox x:Name="DebugCheckBox" Content="Debug Mode" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            <Label Content="Log File:" Width="60" Margin="10,0,0,0"/>
-            <TextBox x:Name="LogFileTextBox" Width="200" Margin="5" Text="captured_packets_simple.txt"/>
+        <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Label Content="Interface:" Width="80"/>
+                <ComboBox x:Name="InterfaceComboBox" Width="300" Margin="5"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Label Content="Ports Mode:" Width="80" Margin="5,0,0,0"/>
+                <ComboBox x:Name="PortsModeComboBox" Width="100" Margin="5"/>
+                <TextBox x:Name="CustomPortsTextBox" Width="150" Margin="5" IsEnabled="False" ToolTip="Enter comma-separated ports (e.g., 80,443)"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Button x:Name="StartButton" Content="Start Sniffing" Width="120" Margin="5" Click="StartButton_Click"/>
+                <Button x:Name="StopButton" Content="Stop Sniffing" Width="120" Margin="5" Click="StopButton_Click" IsEnabled="False"/>
+                <CheckBox x:Name="DebugCheckBox" Content="Debug Mode" Margin="10,0,0,0" VerticalAlignment="Center"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Label Content="Log File:" Width="60" Margin="10,0,0,0"/>
+                <TextBox x:Name="LogFileTextBox" Width="200" Margin="5" Text="captured_packets_simple.txt"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <CheckBox x:Name="OnlyWithPayloadCheckBox" Content="Only show packets with payload" Margin="15,0,0,0" VerticalAlignment="Center" Checked="FilterControlChanged" Unchecked="FilterControlChanged"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Label Content="Protocol:" Width="60" Margin="10,0,0,0" VerticalAlignment="Center"/>
+                <ComboBox x:Name="ProtocolFilterComboBox" Width="100" Margin="5" SelectionChanged="FilterControlChanged">
+                    <ComboBoxItem Content="All" IsSelected="True"/>
+                    <ComboBoxItem Content="TCP"/>
+                    <ComboBoxItem Content="UDP"/>
+                    <ComboBoxItem Content="HTTP"/>
+                </ComboBox>
+            </StackPanel>
         </StackPanel>
 
-        <!-- DataGrid Row -->
         <DataGrid x:Name="PacketsDataGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp}" Width="150"/>
                 <DataGridTextColumn Header="Type" Binding="{Binding Type}" Width="200"/>
+                <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="80"/>
                 <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="150"/>
                 <DataGridTextColumn Header="Destination" Binding="{Binding Destination}" Width="150"/>
                 <DataGridTextColumn Header="Captured Data" Binding="{Binding CapturedData}" Width="*"/>
