@@ -38,7 +38,7 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Label Content="Protocol:" Width="60" Margin="10,0,0,0" VerticalAlignment="Center"/>
                 <ComboBox x:Name="ProtocolFilterComboBox" Width="100" Margin="5" SelectionChanged="FilterControlChanged">
-         s           <ComboBoxItem Content="All" IsSelected="True"/>
+                    <ComboBoxItem Content="All" IsSelected="True"/>
                     <ComboBoxItem Content="TCP"/>
                     <ComboBoxItem Content="UDP"/>
                     <ComboBoxItem Content="HTTP"/>
