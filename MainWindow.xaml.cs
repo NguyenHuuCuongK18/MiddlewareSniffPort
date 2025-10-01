@@ -443,16 +443,39 @@ namespace PacketSnifferWPF
         {
             if (string.IsNullOrEmpty(payload)) return null;
 
-            var stripped = Regex.Replace(payload, @"^[\r\n]+", ""); // Remove leading CRLF
+            // Regex.Replace pattern: ^[\r\n]+
+            // ^           : Anchor at start of the string
+            // [\r\n]+    : One or more CR or LF characters (covers Windows "\r\n" or lone \n/\r) — strips leading blank lines
+            var stripped = Regex.Replace(payload, @"^[\r\n]+", ""); // Remove leading CRLF characters at the very beginning
 
+            // HTTP request line matcher pattern: \b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)
+            // \b                     : Word boundary so method starts at a boundary (avoids matching within a longer token)
+            // (GET|POST|...|CONNECT) : Capturing group #1 enumerating allowed HTTP methods
+            // \s+                    : One or more whitespace characters between method and path
+            // (\S+)                  : Capturing group #2 for the request target/path (one or more non-whitespace chars)
+            // \s+                    : One or more whitespace characters before protocol version
+            // HTTP/                   : Literal "HTTP/"
+            // ([0-9.]+)              : Capturing group #3 for version (digits and dots, e.g., 1.1)
             var reqMatch = Regex.Match(stripped, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase);
             if (reqMatch.Success)
                 return $"HTTP Request ({reqMatch.Groups[1].Value} {reqMatch.Groups[2].Value} HTTP/{reqMatch.Groups[3].Value})";
 
+            // HTTP response status line pattern: HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)
+            // HTTP/         : Literal protocol prefix
+            // ([0-9.]+)     : Capturing group #1 version (digits and dots)
+            // \s+           : One or more whitespace
+            // (\d{3})       : Capturing group #2 exactly 3 digits (status code)
+            // \s+           : One or more whitespace
+            // ([^\r\n]+)   : Capturing group #3 reason phrase (any chars up to first CR or LF)
             var respMatch = Regex.Match(stripped, @"HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)", RegexOptions.IgnoreCase);
             if (respMatch.Success)
                 return $"HTTP Response (HTTP/{respMatch.Groups[1].Value} {respMatch.Groups[2].Value} {respMatch.Groups[3].Value.Trim()})";
 
+            // Header presence heuristic pattern: (?mi)^(Host|User-Agent|Content-Type):
+            // (?mi)            : Inline flags m = multi-line (^ and $ match line boundaries), i = case-insensitive
+            // ^                : Start of a line (due to multiline)
+            // (Host|User-Agent|Content-Type) : Capturing group of header names we care about
+            // :                : Literal colon ending the header name
             if (payload.Contains("HTTP/") || Regex.IsMatch(payload, @"(?mi)^(Host|User-Agent|Content-Type):"))
                 return "HTTP (partial)";
 
@@ -469,19 +492,28 @@ namespace PacketSnifferWPF
         {
             if (string.IsNullOrEmpty(decodedPayload)) return "No payload";
 
-            // HTTP Request
+            // HTTP Request same pattern explanation as above in DetectHttpLabel
+            // Pattern: \b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)
             var reqMatch = Regex.Match(decodedPayload, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase);
             if (reqMatch.Success)
             {
                 string method = reqMatch.Groups[1].Value;
                 string path = reqMatch.Groups[2].Value;
                 string version = reqMatch.Groups[3].Value;
+                // Host header pattern: (?mi)^\s*Host:\s*(.+)$
+                // (?mi)      : m = multiline (^/$ per line), i = ignore case
+                // ^          : Start of line
+                // \s*        : Optional leading whitespace before 'Host'
+                // Host:       : Literal header name + colon
+                // \s*        : Optional whitespace after colon
+                // (.+)        : Capturing group #1 greedy – the remainder of the line (host value)
+                // $          : End of line (multiline context)
                 var hostMatch = Regex.Match(decodedPayload, @"(?mi)^\s*Host:\s*(.+)$");
                 string hostFragment = hostMatch.Success ? $" Host:{hostMatch.Groups[1].Value.Trim()}" : "";
                 return $"{method} {path} HTTP/{version}{hostFragment}";
             }
 
-            // HTTP Response
+            // HTTP Response pattern same as in DetectHttpLabel: HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)
             var respMatch = Regex.Match(decodedPayload, @"HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)", RegexOptions.IgnoreCase);
             if (respMatch.Success)
             {
@@ -491,7 +523,10 @@ namespace PacketSnifferWPF
                 return $"HTTP/{version} {status} {reason}";
             }
 
-            // Fallback: First non-empty line or hex
+            // First non-empty line pattern: (?m)^[^\r\n]+
+            // (?m)       : Multiline so ^ matches start of any line
+            // ^          : Start of a line
+            // [^\r\n]+  : One or more characters that are not CR or LF (captures an entire line until newline)
             var firstLineMatch = Regex.Match(decodedPayload, @"(?m)^[^\r\n]+");
             if (firstLineMatch.Success)
             {
@@ -500,7 +535,7 @@ namespace PacketSnifferWPF
                 return firstLine.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ");
             }
 
-            // Hex preview
+            // Hex preview fallback
             try
             {
                 string hexPreview = BitConverter.ToString(Encoding.UTF8.GetBytes(decodedPayload)).Replace("-", "").Substring(0, Math.Min(64, decodedPayload.Length * 2));
