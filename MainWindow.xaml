@@ -56,6 +56,7 @@
                 <DataGridTextColumn Header="TCP Flags" Binding="{Binding TcpFlags}" Width="100"/>
                 <DataGridTextColumn Header="HTTP Request URI" Binding="{Binding HttpRequestUri}" Width="200"/>
                 <DataGridTextColumn Header="HTTP Headers" Binding="{Binding HttpHeaders}" Width="200"/>
+                <DataGridTextColumn Header="HTTP Body" Binding="{Binding HttpBody}" Width="200"/>
                 <DataGridTextColumn Header="Captured Data" Binding="{Binding CapturedData}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>

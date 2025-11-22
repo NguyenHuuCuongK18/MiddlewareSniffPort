@@ -670,6 +670,60 @@ namespace PacketSnifferWPF
         }
 
         /// <summary>
+        /// Extracts HTTP body from the decoded payload.
+        /// </summary>
+        /// <param name="decodedPayload">The decoded packet payload.</param>
+        /// <returns>The HTTP body content or null if not found.</returns>
+        private string ExtractHttpBody(string decodedPayload)
+        {
+            if (string.IsNullOrEmpty(decodedPayload)) return null;
+
+            // Check if this is an HTTP request or response
+            var isHttp = decodedPayload.Contains("HTTP/");
+
+            if (!isHttp) return null;
+
+            // HTTP body is separated from headers by a double CRLF (\r\n\r\n) or double LF (\n\n)
+            // Try to find the body separator
+            int bodyStartIndex = -1;
+
+            // Try \r\n\r\n first (standard HTTP)
+            bodyStartIndex = decodedPayload.IndexOf("\r\n\r\n");
+            if (bodyStartIndex != -1)
+            {
+                bodyStartIndex += 4; // Move past the separator
+            }
+            else
+            {
+                // Try \n\n (Unix-style line endings)
+                bodyStartIndex = decodedPayload.IndexOf("\n\n");
+                if (bodyStartIndex != -1)
+                {
+                    bodyStartIndex += 2; // Move past the separator
+                }
+            }
+
+            // If we found a body separator and there's content after it
+            if (bodyStartIndex > 0 && bodyStartIndex < decodedPayload.Length)
+            {
+                string body = decodedPayload.Substring(bodyStartIndex);
+                
+                // Trim and return only if non-empty
+                if (!string.IsNullOrWhiteSpace(body))
+                {
+                    // Limit body length for display (max 500 chars)
+                    if (body.Length > 500)
+                    {
+                        return body.Substring(0, 500) + "... (truncated)";
+                    }
+                    return body;
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Processes a captured packet, updating the UI and logs.
         /// </summary>
         /// <param name="srcIp">Source IP address.</param>
@@ -716,6 +770,7 @@ namespace PacketSnifferWPF
             // Extract HTTP request URI and headers
             string httpRequestUri = ExtractHttpRequestUri(decodedPayload);
             string httpHeaders = ExtractHttpHeaders(decodedPayload);
+            string httpBody = ExtractHttpBody(decodedPayload);
 
             // Add to DataGrid (UI thread)
             Dispatcher.Invoke(() =>
@@ -731,7 +786,8 @@ namespace PacketSnifferWPF
                     HasPayload = hasPayload,
                     TcpFlags = tcpFlags,
                     HttpRequestUri = httpRequestUri,
-                    HttpHeaders = httpHeaders
+                    HttpHeaders = httpHeaders,
+                    HttpBody = httpBody
                 });
 
                 // Apply filter refresh immediately so UI updates filtered list promptly
