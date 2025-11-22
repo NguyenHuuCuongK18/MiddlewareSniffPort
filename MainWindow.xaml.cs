@@ -33,6 +33,15 @@ namespace PacketSnifferWPF
         private CancellationTokenSource _cancellationTokenSource;
         private bool _monitorAllPorts;
 
+        // Compiled regex patterns for better performance
+        private static readonly Regex HttpRequestRegex = new Regex(
+            @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        
+        private static readonly Regex HttpMethodRegex = new Regex(
+            @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         /// <summary>
         /// Initializes a new instance of the <see cref="MainWindow"/> class.
         /// Sets up the UI, data bindings, and event handlers.
@@ -548,6 +557,23 @@ namespace PacketSnifferWPF
         }
 
         /// <summary>
+        /// Checks if a line starts with an HTTP method.
+        /// </summary>
+        /// <param name="line">The line to check.</param>
+        /// <returns>True if the line starts with an HTTP method, false otherwise.</returns>
+        private bool IsHttpMethodLine(string line)
+        {
+            return line.StartsWith("GET", StringComparison.OrdinalIgnoreCase) ||
+                   line.StartsWith("POST", StringComparison.OrdinalIgnoreCase) ||
+                   line.StartsWith("PUT", StringComparison.OrdinalIgnoreCase) ||
+                   line.StartsWith("DELETE", StringComparison.OrdinalIgnoreCase) ||
+                   line.StartsWith("HEAD", StringComparison.OrdinalIgnoreCase) ||
+                   line.StartsWith("OPTIONS", StringComparison.OrdinalIgnoreCase) ||
+                   line.StartsWith("PATCH", StringComparison.OrdinalIgnoreCase) ||
+                   line.StartsWith("CONNECT", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
         /// Extracts TCP flags from a TCP packet.
         /// </summary>
         /// <param name="tcp">The TCP packet.</param>
@@ -576,7 +602,7 @@ namespace PacketSnifferWPF
         {
             if (string.IsNullOrEmpty(decodedPayload)) return null;
 
-            var reqMatch = Regex.Match(decodedPayload, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase);
+            var reqMatch = HttpRequestRegex.Match(decodedPayload);
             if (reqMatch.Success)
             {
                 return reqMatch.Groups[2].Value;
@@ -595,8 +621,7 @@ namespace PacketSnifferWPF
             if (string.IsNullOrEmpty(decodedPayload)) return null;
 
             // Check if this is an HTTP request or response
-            var isHttp = decodedPayload.Contains("HTTP/") || 
-                         Regex.IsMatch(decodedPayload, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+", RegexOptions.IgnoreCase);
+            var isHttp = decodedPayload.Contains("HTTP/") || HttpMethodRegex.IsMatch(decodedPayload);
 
             if (!isHttp) return null;
 
@@ -610,15 +635,7 @@ namespace PacketSnifferWPF
                 if (!inHeaders)
                 {
                     // First line is the request/response line, skip it
-                    if (line.StartsWith("GET", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("POST", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("PUT", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("DELETE", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("HEAD", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("OPTIONS", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("PATCH", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("CONNECT", StringComparison.OrdinalIgnoreCase) ||
-                        line.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase))
+                    if (IsHttpMethodLine(line) || line.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase))
                     {
                         inHeaders = true;
                         continue;
