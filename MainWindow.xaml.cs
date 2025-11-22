@@ -33,6 +33,9 @@ namespace PacketSnifferWPF
         private CancellationTokenSource _cancellationTokenSource;
         private bool _monitorAllPorts;
 
+        // Constants
+        private const int MaxBodyDisplayLength = 500;
+
         // Compiled regex patterns for better performance
         private static readonly Regex HttpRequestRegex = new Regex(
             @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)",
@@ -706,17 +709,17 @@ namespace PacketSnifferWPF
             }
 
             // If we found a body separator and there's content after it
-            if (bodyStartIndex >= 0 && bodyStartIndex < decodedPayload.Length)
+            if (bodyStartIndex != -1 && bodyStartIndex < decodedPayload.Length)
             {
                 string body = decodedPayload.Substring(bodyStartIndex);
                 
                 // Trim and return only if non-empty
                 if (!string.IsNullOrWhiteSpace(body))
                 {
-                    // Limit body length for display (max 500 chars)
-                    if (body.Length > 500)
+                    // Limit body length for display
+                    if (body.Length > MaxBodyDisplayLength)
                     {
-                        return body.Substring(0, 500) + "... (truncated)";
+                        return body.Substring(0, MaxBodyDisplayLength) + "... (truncated)";
                     }
                     return body;
                 }
