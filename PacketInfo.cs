@@ -63,5 +63,10 @@ namespace PacketSnifferWPF
         /// Gets or sets the HTTP headers for HTTP packets.
         /// </summary>
         public string HttpHeaders { get; set; }
+
+        /// <summary>
+        /// Gets or sets the HTTP body for HTTP packets.
+        /// </summary>
+        public string HttpBody { get; set; }
     }
 }
