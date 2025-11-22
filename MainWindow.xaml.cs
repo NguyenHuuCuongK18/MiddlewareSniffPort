@@ -610,18 +610,25 @@ namespace PacketSnifferWPF
         }
 
         /// <summary>
+        /// Checks if the payload contains HTTP protocol data.
+        /// </summary>
+        /// <param name="decodedPayload">The decoded packet payload.</param>
+        /// <returns>True if the payload contains HTTP data, false otherwise.</returns>
+        private bool IsHttpPayload(string decodedPayload)
+        {
+            if (string.IsNullOrEmpty(decodedPayload)) return false;
+
+            return decodedPayload.Contains("HTTP/");
+        }
+
+        /// <summary>
         /// Extracts HTTP headers from the decoded payload.
         /// </summary>
         /// <param name="decodedPayload">The decoded packet payload.</param>
         /// <returns>A formatted string of HTTP headers or null if not found.</returns>
         private string ExtractHttpHeaders(string decodedPayload)
         {
-            if (string.IsNullOrEmpty(decodedPayload)) return null;
-
-            // Check if this is an HTTP request or response
-            var isHttp = decodedPayload.Contains("HTTP/");
-
-            if (!isHttp) return null;
+            if (!IsHttpPayload(decodedPayload)) return null;
 
             // Extract headers (lines after the request/response line until the first empty line)
             var lines = decodedPayload.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -676,12 +683,7 @@ namespace PacketSnifferWPF
         /// <returns>The HTTP body content or null if not found.</returns>
         private string ExtractHttpBody(string decodedPayload)
         {
-            if (string.IsNullOrEmpty(decodedPayload)) return null;
-
-            // Check if this is an HTTP request or response
-            var isHttp = decodedPayload.Contains("HTTP/");
-
-            if (!isHttp) return null;
+            if (!IsHttpPayload(decodedPayload)) return null;
 
             // HTTP body is separated from headers by a double CRLF (\r\n\r\n) or double LF (\n\n)
             // Try to find the body separator
@@ -704,7 +706,7 @@ namespace PacketSnifferWPF
             }
 
             // If we found a body separator and there's content after it
-            if (bodyStartIndex > 0 && bodyStartIndex < decodedPayload.Length)
+            if (bodyStartIndex >= 0 && bodyStartIndex < decodedPayload.Length)
             {
                 string body = decodedPayload.Substring(bodyStartIndex);
                 
