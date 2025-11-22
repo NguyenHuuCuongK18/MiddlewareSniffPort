@@ -16,9 +16,6 @@
         }
       },
       "PacketDotNet/1.4.8": {
-        "dependencies": {
-          "System.Runtime.CompilerServices.Unsafe": "6.0.0"
-        },
         "runtime": {
           "lib/net8.0/PacketDotNet.dll": {
             "assemblyVersion": "1.4.8.0",
@@ -29,7 +26,6 @@
       "SharpPcap/6.3.1": {
         "dependencies": {
           "PacketDotNet": "1.4.8",
-          "System.Memory": "4.6.3",
           "System.Text.Encoding.CodePages": "9.0.5"
         },
         "runtime": {
@@ -39,8 +35,6 @@
           }
         }
       },
-      "System.Memory/4.6.3": {},
-      "System.Runtime.CompilerServices.Unsafe/6.0.0": {},
       "System.Text.Encoding.CodePages/9.0.5": {
         "runtime": {
           "lib/net8.0/System.Text.Encoding.CodePages.dll": {
@@ -78,20 +72,6 @@
       "sha512": "sha512-EWclXz+QdffBRppFR7GDBLyKiAz045RGvu4t4gcMGocVMEq6dRfCnAEx7Ep6qxcPPhH2kz13Y8FqBaHZhsh3Pg==",
       "path": "sharppcap/6.3.1",
       "hashPath": "sharppcap.6.3.1.nupkg.sha512"
-    },
-    "System.Memory/4.6.3": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-qdcDOgnFZY40+Q9876JUHnlHu7bosOHX8XISRoH94fwk6hgaeQGSgfZd8srWRZNt5bV9ZW2TljcegDNxsf+96A==",
-      "path": "system.memory/4.6.3",
-      "hashPath": "system.memory.4.6.3.nupkg.sha512"
-    },
-    "System.Runtime.CompilerServices.Unsafe/6.0.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-/iUeP3tq1S0XdNNoMz5C9twLSrM/TH+qElHkXWaPvuNOt+99G75NrV0OS2EqHx5wMN7popYjpc8oTjC1y16DLg==",
-      "path": "system.runtime.compilerservices.unsafe/6.0.0",
-      "hashPath": "system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512"
     },
     "System.Text.Encoding.CodePages/9.0.5": {
       "type": "package",

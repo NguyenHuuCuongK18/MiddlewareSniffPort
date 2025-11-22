@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MiddlewareTest")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a1a538def6ee246041514466120572dade23e59c")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ffa1d1748f628f65646b383495b9a84be5771a1b")]
 [assembly: System.Reflection.AssemblyProductAttribute("MiddlewareTest")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MiddlewareTest")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

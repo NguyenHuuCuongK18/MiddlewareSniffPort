@@ -34,7 +34,7 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 211,
+          "SelectedChildIndex": 210,
           "Children": [
             {
               "$type": "Bookmark",
@@ -857,10 +857,6 @@
               "Name": "ST:0:0:{d78612c7-9962-4b83-95d9-268046dad23a}"
             },
             {
-              "$type": "Bookmark",
-              "Name": "ST:1:0:{d212f56b-c48a-434c-a121-1c5d80b59b9f}"
-            },
-            {
               "$type": "Document",
               "DocumentIndex": 1,
               "Title": "MainWindow.xaml",
@@ -869,8 +865,7 @@
               "ToolTip": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MainWindow.xaml",
               "RelativeToolTip": "MainWindow.xaml",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
-              "WhenOpened": "2025-09-30T14:57:58.058Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-30T14:57:58.058Z"
             },
             {
               "$type": "Document",
@@ -928,10 +923,13 @@
               "RelativeDocumentMoniker": "MainWindow.xaml.cs",
               "ToolTip": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MainWindow.xaml.cs",
               "RelativeToolTip": "MainWindow.xaml.cs",
-              "ViewState": "AgIAAGICAAAAAAAAAAAswHMCAAABAAAAAAAAAA==",
+              "ViewState": "AgIAABMCAAAAAAAAAAAuwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-09-29T05:38:55.691Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-09-29T05:38:55.691Z"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:1:0:{d212f56b-c48a-434c-a121-1c5d80b59b9f}"
             }
           ]
         },
