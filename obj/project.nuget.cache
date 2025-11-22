@@ -1,14 +1,18 @@
 {
   "version": 2,
-  "dgSpecHash": "s7xR33578Yw=",
+  "dgSpecHash": "3F0fSv6bVYk=",
   "success": true,
-  "projectFilePath": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MiddlewareTest.csproj",
+  "projectFilePath": "/home/runner/work/MiddlewareSniffPort/MiddlewareSniffPort/MiddlewareTest.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\PC\\.nuget\\packages\\packetdotnet\\1.4.8\\packetdotnet.1.4.8.nupkg.sha512",
-    "C:\\Users\\PC\\.nuget\\packages\\sharppcap\\6.3.1\\sharppcap.6.3.1.nupkg.sha512",
-    "C:\\Users\\PC\\.nuget\\packages\\system.memory\\4.6.3\\system.memory.4.6.3.nupkg.sha512",
-    "C:\\Users\\PC\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
-    "C:\\Users\\PC\\.nuget\\packages\\system.text.encoding.codepages\\9.0.5\\system.text.encoding.codepages.9.0.5.nupkg.sha512"
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/packetdotnet/1.4.8/packetdotnet.1.4.8.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/sharppcap/6.3.1/sharppcap.6.3.1.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/system.memory/4.6.3/system.memory.4.6.3.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/system.runtime.compilerservices.unsafe/6.0.0/system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/system.text.encoding.codepages/9.0.5/system.text.encoding.codepages.9.0.5.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/microsoft.netcore.app.ref/8.0.22/microsoft.netcore.app.ref.8.0.22.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/microsoft.windowsdesktop.app.ref/8.0.22/microsoft.windowsdesktop.app.ref.8.0.22.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/microsoft.aspnetcore.app.ref/8.0.22/microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512",
+    "/home/runner/work/MiddlewareSniffPort/.codeql-scratch/dbs/csharp/working/packages/microsoft.netcore.app.host.linux-x64/8.0.22/microsoft.netcore.app.host.linux-x64.8.0.22.nupkg.sha512"
   ],
   "logs": []
 }

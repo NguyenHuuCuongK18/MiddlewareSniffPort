@@ -33,6 +33,9 @@ namespace PacketSnifferWPF
         private CancellationTokenSource _cancellationTokenSource;
         private bool _monitorAllPorts;
 
+        // Constants
+        private const int MaxBodyDisplayLength = 500;
+
         // Compiled regex patterns for better performance
         private static readonly Regex HttpRequestRegex = new Regex(
             @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)",
@@ -610,18 +613,25 @@ namespace PacketSnifferWPF
         }
 
         /// <summary>
+        /// Checks if the payload contains HTTP protocol data.
+        /// </summary>
+        /// <param name="decodedPayload">The decoded packet payload.</param>
+        /// <returns>True if the payload contains HTTP data, false otherwise.</returns>
+        private bool IsHttpPayload(string decodedPayload)
+        {
+            if (string.IsNullOrEmpty(decodedPayload)) return false;
+
+            return decodedPayload.Contains("HTTP/");
+        }
+
+        /// <summary>
         /// Extracts HTTP headers from the decoded payload.
         /// </summary>
         /// <param name="decodedPayload">The decoded packet payload.</param>
         /// <returns>A formatted string of HTTP headers or null if not found.</returns>
         private string ExtractHttpHeaders(string decodedPayload)
         {
-            if (string.IsNullOrEmpty(decodedPayload)) return null;
-
-            // Check if this is an HTTP request or response
-            var isHttp = decodedPayload.Contains("HTTP/");
-
-            if (!isHttp) return null;
+            if (!IsHttpPayload(decodedPayload)) return null;
 
             // Extract headers (lines after the request/response line until the first empty line)
             var lines = decodedPayload.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -664,6 +674,55 @@ namespace PacketSnifferWPF
                     result += "...";
                 }
                 return result;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Extracts HTTP body from the decoded payload.
+        /// </summary>
+        /// <param name="decodedPayload">The decoded packet payload.</param>
+        /// <returns>The HTTP body content or null if not found.</returns>
+        private string ExtractHttpBody(string decodedPayload)
+        {
+            if (!IsHttpPayload(decodedPayload)) return null;
+
+            // HTTP body is separated from headers by a double CRLF (\r\n\r\n) or double LF (\n\n)
+            // Try to find the body separator
+            int bodyStartIndex = -1;
+
+            // Try \r\n\r\n first (standard HTTP)
+            bodyStartIndex = decodedPayload.IndexOf("\r\n\r\n");
+            if (bodyStartIndex != -1)
+            {
+                bodyStartIndex += 4; // Move past the separator
+            }
+            else
+            {
+                // Try \n\n (Unix-style line endings)
+                bodyStartIndex = decodedPayload.IndexOf("\n\n");
+                if (bodyStartIndex != -1)
+                {
+                    bodyStartIndex += 2; // Move past the separator
+                }
+            }
+
+            // If we found a body separator and there's content after it
+            if (bodyStartIndex != -1 && bodyStartIndex < decodedPayload.Length)
+            {
+                string body = decodedPayload.Substring(bodyStartIndex);
+                
+                // Trim and return only if non-empty
+                if (!string.IsNullOrWhiteSpace(body))
+                {
+                    // Limit body length for display
+                    if (body.Length > MaxBodyDisplayLength)
+                    {
+                        return body.Substring(0, MaxBodyDisplayLength) + "... (truncated)";
+                    }
+                    return body;
+                }
             }
 
             return null;
@@ -716,6 +775,7 @@ namespace PacketSnifferWPF
             // Extract HTTP request URI and headers
             string httpRequestUri = ExtractHttpRequestUri(decodedPayload);
             string httpHeaders = ExtractHttpHeaders(decodedPayload);
+            string httpBody = ExtractHttpBody(decodedPayload);
 
             // Add to DataGrid (UI thread)
             Dispatcher.Invoke(() =>
@@ -731,7 +791,8 @@ namespace PacketSnifferWPF
                     HasPayload = hasPayload,
                     TcpFlags = tcpFlags,
                     HttpRequestUri = httpRequestUri,
-                    HttpHeaders = httpHeaders
+                    HttpHeaders = httpHeaders,
+                    HttpBody = httpBody
                 });
 
                 // Apply filter refresh immediately so UI updates filtered list promptly
