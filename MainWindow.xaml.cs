@@ -241,7 +241,7 @@ namespace PacketSnifferWPF
                 return (new List<int> { 80, 443, 8000, 8080, 8888 }, false);
 
             if (portsArg.Equals("targeted", StringComparison.OrdinalIgnoreCase))
-                return (new List<int> { 5000, 8080 }, false);
+                return (new List<int> { 8000, 8001 }, false);
 
             try
             {
