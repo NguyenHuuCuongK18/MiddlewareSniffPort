@@ -419,7 +419,7 @@ namespace PacketSnifferWPF
                     return;
 
                 // Now hand off to UI/logging
-                ProcessPacket(srcIp, srcPort, dstIp, dstPort, decodedPayload, protocolLabel, packet);
+                ProcessPacket(srcIp, srcPort, dstIp, dstPort, decodedPayload, protocolLabel, packet, tcp);
             }
             catch (Exception ex)
             {
@@ -548,6 +548,113 @@ namespace PacketSnifferWPF
         }
 
         /// <summary>
+        /// Extracts TCP flags from a TCP packet.
+        /// </summary>
+        /// <param name="tcp">The TCP packet.</param>
+        /// <returns>A comma-separated string of TCP flags, or null if no flags are set.</returns>
+        private string ExtractTcpFlags(TcpPacket tcp)
+        {
+            if (tcp == null) return null;
+
+            var flags = new List<string>();
+            if (tcp.Fin) flags.Add("FIN");
+            if (tcp.Syn) flags.Add("SYN");
+            if (tcp.Rst) flags.Add("RST");
+            if (tcp.Psh) flags.Add("PSH");
+            if (tcp.Ack) flags.Add("ACK");
+            if (tcp.Urg) flags.Add("URG");
+
+            return flags.Count > 0 ? string.Join(", ", flags) : null;
+        }
+
+        /// <summary>
+        /// Extracts HTTP request URI from the decoded payload.
+        /// </summary>
+        /// <param name="decodedPayload">The decoded packet payload.</param>
+        /// <returns>The HTTP request URI or null if not found.</returns>
+        private string ExtractHttpRequestUri(string decodedPayload)
+        {
+            if (string.IsNullOrEmpty(decodedPayload)) return null;
+
+            var reqMatch = Regex.Match(decodedPayload, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase);
+            if (reqMatch.Success)
+            {
+                return reqMatch.Groups[2].Value;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Extracts HTTP headers from the decoded payload.
+        /// </summary>
+        /// <param name="decodedPayload">The decoded packet payload.</param>
+        /// <returns>A formatted string of HTTP headers or null if not found.</returns>
+        private string ExtractHttpHeaders(string decodedPayload)
+        {
+            if (string.IsNullOrEmpty(decodedPayload)) return null;
+
+            // Check if this is an HTTP request or response
+            var isHttp = decodedPayload.Contains("HTTP/") || 
+                         Regex.IsMatch(decodedPayload, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+", RegexOptions.IgnoreCase);
+
+            if (!isHttp) return null;
+
+            // Extract headers (lines after the request/response line until the first empty line)
+            var lines = decodedPayload.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var headers = new List<string>();
+            bool inHeaders = false;
+
+            foreach (var line in lines)
+            {
+                if (!inHeaders)
+                {
+                    // First line is the request/response line, skip it
+                    if (line.StartsWith("GET", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("POST", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("PUT", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("DELETE", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("HEAD", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("OPTIONS", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("PATCH", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("CONNECT", StringComparison.OrdinalIgnoreCase) ||
+                        line.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inHeaders = true;
+                        continue;
+                    }
+                }
+                else
+                {
+                    // Empty line marks end of headers
+                    if (string.IsNullOrWhiteSpace(line))
+                    {
+                        break;
+                    }
+
+                    // Check if line contains a colon (header format)
+                    if (line.Contains(":"))
+                    {
+                        headers.Add(line.Trim());
+                    }
+                }
+            }
+
+            if (headers.Count > 0)
+            {
+                // Limit to first few headers to avoid cluttering the UI
+                var result = string.Join("; ", headers.Take(5));
+                if (headers.Count > 5)
+                {
+                    result += "...";
+                }
+                return result;
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// Processes a captured packet, updating the UI and logs.
         /// </summary>
         /// <param name="srcIp">Source IP address.</param>
@@ -557,7 +664,8 @@ namespace PacketSnifferWPF
         /// <param name="decodedPayload">Decoded packet payload.</param>
         /// <param name="protocolLabel">Protocol label.</param>
         /// <param name="packet">The parsed packet object.</param>
-        private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string decodedPayload, string protocolLabel, PacketDotNet.Packet packet)
+        /// <param name="tcpPacket">The TCP packet (if available).</param>
+        private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string decodedPayload, string protocolLabel, PacketDotNet.Packet packet, TcpPacket tcpPacket = null)
         {
             string infoPkg = GetInformationPackage(protocolLabel, decodedPayload);
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -587,6 +695,13 @@ namespace PacketSnifferWPF
 
             bool hasPayload = !string.IsNullOrEmpty(decodedPayload);
 
+            // Extract TCP flags
+            string tcpFlags = ExtractTcpFlags(tcpPacket);
+
+            // Extract HTTP request URI and headers
+            string httpRequestUri = ExtractHttpRequestUri(decodedPayload);
+            string httpHeaders = ExtractHttpHeaders(decodedPayload);
+
             // Add to DataGrid (UI thread)
             Dispatcher.Invoke(() =>
             {
@@ -598,7 +713,10 @@ namespace PacketSnifferWPF
                     Source = source,
                     Destination = destination,
                     CapturedData = infoPkg,
-                    HasPayload = hasPayload
+                    HasPayload = hasPayload,
+                    TcpFlags = tcpFlags,
+                    HttpRequestUri = httpRequestUri,
+                    HttpHeaders = httpHeaders
                 });
 
                 // Apply filter refresh immediately so UI updates filtered list promptly

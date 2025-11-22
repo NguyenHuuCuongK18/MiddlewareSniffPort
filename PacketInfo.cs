@@ -48,5 +48,20 @@ namespace PacketSnifferWPF
         /// Gets or sets a value indicating whether the packet has a non-empty payload.
         /// </summary>
         public bool HasPayload { get; set; }
+
+        /// <summary>
+        /// Gets or sets the TCP flags (e.g., "ACK", "FIN", "SYN", etc.) for TCP packets.
+        /// </summary>
+        public string TcpFlags { get; set; }
+
+        /// <summary>
+        /// Gets or sets the HTTP request URI for HTTP request packets.
+        /// </summary>
+        public string HttpRequestUri { get; set; }
+
+        /// <summary>
+        /// Gets or sets the HTTP headers for HTTP packets.
+        /// </summary>
+        public string HttpHeaders { get; set; }
     }
 }
