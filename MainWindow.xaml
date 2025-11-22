@@ -53,6 +53,9 @@
                 <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="80"/>
                 <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="150"/>
                 <DataGridTextColumn Header="Destination" Binding="{Binding Destination}" Width="150"/>
+                <DataGridTextColumn Header="TCP Flags" Binding="{Binding TcpFlags}" Width="100"/>
+                <DataGridTextColumn Header="HTTP Request URI" Binding="{Binding HttpRequestUri}" Width="200"/>
+                <DataGridTextColumn Header="HTTP Headers" Binding="{Binding HttpHeaders}" Width="200"/>
                 <DataGridTextColumn Header="Captured Data" Binding="{Binding CapturedData}" Width="*"/>
             </DataGrid.Columns>
         </DataGrid>
