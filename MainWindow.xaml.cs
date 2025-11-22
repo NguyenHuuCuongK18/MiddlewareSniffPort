@@ -37,10 +37,6 @@ namespace PacketSnifferWPF
         private static readonly Regex HttpRequestRegex = new Regex(
             @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
-        
-        private static readonly Regex HttpMethodRegex = new Regex(
-            @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MainWindow"/> class.
@@ -563,6 +559,8 @@ namespace PacketSnifferWPF
         /// <returns>True if the line starts with an HTTP method, false otherwise.</returns>
         private bool IsHttpMethodLine(string line)
         {
+            if (string.IsNullOrEmpty(line)) return false;
+            
             return line.StartsWith("GET", StringComparison.OrdinalIgnoreCase) ||
                    line.StartsWith("POST", StringComparison.OrdinalIgnoreCase) ||
                    line.StartsWith("PUT", StringComparison.OrdinalIgnoreCase) ||
@@ -621,7 +619,7 @@ namespace PacketSnifferWPF
             if (string.IsNullOrEmpty(decodedPayload)) return null;
 
             // Check if this is an HTTP request or response
-            var isHttp = decodedPayload.Contains("HTTP/") || HttpMethodRegex.IsMatch(decodedPayload);
+            var isHttp = decodedPayload.Contains("HTTP/");
 
             if (!isHttp) return null;
 
