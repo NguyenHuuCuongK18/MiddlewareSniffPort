@@ -10,15 +10,5 @@
     "C:\\Users\\PC\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\6.0.0\\system.runtime.compilerservices.unsafe.6.0.0.nupkg.sha512",
     "C:\\Users\\PC\\.nuget\\packages\\system.text.encoding.codepages\\9.0.5\\system.text.encoding.codepages.9.0.5.nupkg.sha512"
   ],
-  "logs": [
-    {
-      "code": "Undefined",
-      "level": "Warning",
-      "message": "Problem reading the cache file C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\obj\\project.nuget.cache : '<' is an invalid start of a property name. Expected a '\"'. Path: $ | LineNumber: 2 | BytePositionInLine: 0.",
-      "projectPath": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MiddlewareTest.csproj",
-      "warningLevel": 1,
-      "filePath": "C:\\Users\\PC\\Documents\\School\\NET\\MiddlewareTest\\MiddlewareTest.csproj",
-      "targetGraphs": []
-    }
-  ]
+  "logs": []
 }

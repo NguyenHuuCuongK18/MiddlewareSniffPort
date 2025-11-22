@@ -581,12 +581,12 @@ namespace PacketSnifferWPF
             if (tcp == null) return null;
 
             var flags = new List<string>();
-            if (tcp.Fin) flags.Add("FIN");
-            if (tcp.Syn) flags.Add("SYN");
-            if (tcp.Rst) flags.Add("RST");
-            if (tcp.Psh) flags.Add("PSH");
-            if (tcp.Ack) flags.Add("ACK");
-            if (tcp.Urg) flags.Add("URG");
+            if (tcp.Finished) flags.Add("FIN");
+            if (tcp.Synchronize) flags.Add("SYN");
+            if (tcp.Reset) flags.Add("RST");
+            if (tcp.Push) flags.Add("PSH");
+            if (tcp.Acknowledgment) flags.Add("ACK");
+            if (tcp.Urgent) flags.Add("URG");
 
             return flags.Count > 0 ? string.Join(", ", flags) : null;
         }
