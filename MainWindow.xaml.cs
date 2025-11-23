@@ -32,9 +32,10 @@ namespace PacketSnifferWPF
         private StreamWriter _fullPayloadWriter;
         private CancellationTokenSource _cancellationTokenSource;
         private bool _monitorAllPorts;
+        private string _lastConnectionState = UI_Keywords.StateIdle;
 
         // Constants
-        private const int MaxBodyDisplayLength = 500;
+        private const int MaxBodyDisplayLength = Logging_Keywords.MaxBodyDisplayLength;
 
         // Compiled regex patterns for better performance
         private static readonly Regex HttpRequestRegex = new Regex(
@@ -53,6 +54,9 @@ namespace PacketSnifferWPF
             PacketsDataGrid.ItemsSource = _packets;
             _packetsView = CollectionViewSource.GetDefaultView(_packets);
             _packetsView.Filter = PacketFilter;
+
+            // Initialize connection state label
+            ConnectionStateLabel.Content = UI_Keywords.StateIdle;
 
             // Set up ports mode ComboBox
             PortsModeComboBox.ItemsSource = new List<string> { "all", "common", "targeted", "custom" };
@@ -227,6 +231,17 @@ namespace PacketSnifferWPF
             _fullPayloadWriter?.Close();
             StartButton.IsEnabled = true;
             StopButton.IsEnabled = false;
+        }
+
+        /// <summary>
+        /// Clears all captured packets from the DataGrid when the Clear button is clicked.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
+        private void ClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            _packets.Clear();
+            UpdateConnectionStateLabel(UI_Keywords.StateIdle);
         }
 
         /// <summary>
@@ -584,12 +599,14 @@ namespace PacketSnifferWPF
             if (tcp == null) return null;
 
             var flags = new List<string>();
-            if (tcp.Finished) flags.Add("FIN");
-            if (tcp.Synchronize) flags.Add("SYN");
-            if (tcp.Reset) flags.Add("RST");
-            if (tcp.Push) flags.Add("PSH");
-            if (tcp.Acknowledgment) flags.Add("ACK");
-            if (tcp.Urgent) flags.Add("URG");
+            if (tcp.Finished) flags.Add(Network_Keywords.TcpFlagFIN);
+            if (tcp.Synchronize) flags.Add(Network_Keywords.TcpFlagSYN);
+            if (tcp.Reset) flags.Add(Network_Keywords.TcpFlagRST);
+            if (tcp.Push) flags.Add(Network_Keywords.TcpFlagPSH);
+            if (tcp.Acknowledgment) flags.Add(Network_Keywords.TcpFlagACK);
+            if (tcp.Urgent) flags.Add(Network_Keywords.TcpFlagURG);
+            if (tcp.ECN) flags.Add(Network_Keywords.TcpFlagECE);
+            if (tcp.CongestionWindowReduced) flags.Add(Network_Keywords.TcpFlagCWR);
 
             return flags.Count > 0 ? string.Join(", ", flags) : null;
         }
@@ -719,13 +736,111 @@ namespace PacketSnifferWPF
                     // Limit body length for display
                     if (body.Length > MaxBodyDisplayLength)
                     {
-                        return body.Substring(0, MaxBodyDisplayLength) + "... (truncated)";
+                        return body.Substring(0, MaxBodyDisplayLength) + Logging_Keywords.TruncatedSuffix;
                     }
                     return body;
                 }
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Determines the connection state based on TCP flags.
+        /// </summary>
+        /// <param name="tcp">The TCP packet.</param>
+        /// <returns>A string describing the connection state.</returns>
+        private string DetermineConnectionState(TcpPacket tcp)
+        {
+            if (tcp == null)
+                return null;
+
+            // Check for RST flag first - indicates connection reset/error
+            if (tcp.Reset)
+            {
+                return UI_Keywords.StateConnectionReset;
+            }
+
+            // Check for SYN flag combinations
+            if (tcp.Synchronize && tcp.Acknowledgment)
+            {
+                // SYN-ACK: Server responding to client's connection request
+                return UI_Keywords.StateServerResponding;
+            }
+            else if (tcp.Synchronize)
+            {
+                // SYN only: Client initiating connection
+                return UI_Keywords.StateClientConnecting;
+            }
+
+            // Check for FIN flag combinations
+            if (tcp.Finished && tcp.Acknowledgment)
+            {
+                // FIN-ACK: Acknowledging connection close
+                return UI_Keywords.StateConnectionClosing;
+            }
+            else if (tcp.Finished)
+            {
+                // FIN only: Initiating connection close
+                // Determine if it's client or server based on some heuristic
+                // For simplicity, we'll use a generic message
+                return UI_Keywords.StateClientDisconnecting;
+            }
+
+            // Check for data transfer
+            if (tcp.Push && tcp.Acknowledgment)
+            {
+                // PSH-ACK: Data being transferred
+                return UI_Keywords.StateDataTransfer;
+            }
+
+            // Check for ACK only - connection established or acknowledging data
+            if (tcp.Acknowledgment && !tcp.Synchronize && !tcp.Finished && !tcp.Reset && !tcp.Push)
+            {
+                // Pure ACK: Could be connection established or acknowledging received data
+                return UI_Keywords.StateConnectionEstablished;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Updates the connection state label in the UI.
+        /// </summary>
+        /// <param name="state">The new connection state.</param>
+        private void UpdateConnectionStateLabel(string state)
+        {
+            if (string.IsNullOrEmpty(state))
+                return;
+
+            _lastConnectionState = state;
+            
+            Dispatcher.Invoke(() =>
+            {
+                ConnectionStateLabel.Content = state;
+                
+                // Change color based on state
+                if (state.Contains("Error") || state.Contains("reset") || state.Contains("RST"))
+                {
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Red;
+                }
+                else if (state.Contains("established") || state.Contains("transfer"))
+                {
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Green;
+                }
+                else if (state.Contains("closing") || state.Contains("disconnecting"))
+                {
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Orange;
+                }
+                else if (state.Contains("connecting") || state.Contains("responding"))
+                {
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Blue;
+                }
+                else
+                {
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Gray;
+                }
+            });
         }
 
         /// <summary>
@@ -772,6 +887,13 @@ namespace PacketSnifferWPF
             // Extract TCP flags
             string tcpFlags = ExtractTcpFlags(tcpPacket);
 
+            // Determine connection state
+            string connectionState = DetermineConnectionState(tcpPacket);
+            if (!string.IsNullOrEmpty(connectionState))
+            {
+                UpdateConnectionStateLabel(connectionState);
+            }
+
             // Extract HTTP request URI and headers
             string httpRequestUri = ExtractHttpRequestUri(decodedPayload);
             string httpHeaders = ExtractHttpHeaders(decodedPayload);
@@ -790,6 +912,7 @@ namespace PacketSnifferWPF
                     CapturedData = infoPkg,
                     HasPayload = hasPayload,
                     TcpFlags = tcpFlags,
+                    ConnectionState = connectionState,
                     HttpRequestUri = httpRequestUri,
                     HttpHeaders = httpHeaders,
                     HttpBody = httpBody

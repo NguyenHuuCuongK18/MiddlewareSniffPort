@@ -12,6 +12,12 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <!-- Status Row -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
+            <Label Content="Connection State:" Width="120" FontWeight="Bold"/>
+            <Label x:Name="ConnectionStateLabel" Content="Idle" Width="500" FontWeight="Bold" Foreground="Blue"/>
+        </StackPanel>
+
         <!-- Controls Row -->
         <StackPanel Grid.Row="0" Orientation="Vertical" Margin="0,0,0,10">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -26,6 +32,7 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="StartButton" Content="Start Sniffing" Width="120" Margin="5" Click="StartButton_Click"/>
                 <Button x:Name="StopButton" Content="Stop Sniffing" Width="120" Margin="5" Click="StopButton_Click" IsEnabled="False"/>
+                <Button x:Name="ClearButton" Content="Clear" Width="100" Margin="5" Click="ClearButton_Click"/>
                 <CheckBox x:Name="DebugCheckBox" Content="Debug Mode" Margin="10,0,0,0" VerticalAlignment="Center"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -53,7 +60,8 @@
                 <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="80"/>
                 <DataGridTextColumn Header="Source" Binding="{Binding Source}" Width="150"/>
                 <DataGridTextColumn Header="Destination" Binding="{Binding Destination}" Width="150"/>
-                <DataGridTextColumn Header="TCP Flags" Binding="{Binding TcpFlags}" Width="100"/>
+                <DataGridTextColumn Header="TCP Flags" Binding="{Binding TcpFlags}" Width="120"/>
+                <DataGridTextColumn Header="Connection State" Binding="{Binding ConnectionState}" Width="200"/>
                 <DataGridTextColumn Header="HTTP Request URI" Binding="{Binding HttpRequestUri}" Width="200"/>
                 <DataGridTextColumn Header="HTTP Headers" Binding="{Binding HttpHeaders}" Width="200"/>
                 <DataGridTextColumn Header="HTTP Body" Binding="{Binding HttpBody}" Width="200"/>

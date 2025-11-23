@@ -68,5 +68,10 @@ namespace PacketSnifferWPF
         /// Gets or sets the HTTP body for HTTP packets.
         /// </summary>
         public string HttpBody { get; set; }
+
+        /// <summary>
+        /// Gets or sets the connection state based on TCP flags.
+        /// </summary>
+        public string ConnectionState { get; set; }
     }
 }
