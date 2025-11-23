@@ -15,7 +15,7 @@
         <!-- Status Row -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,10">
             <Label Content="Connection State:" Width="120" FontWeight="Bold"/>
-            <Label x:Name="ConnectionStateLabel" Content="Idle" Width="500" FontWeight="Bold" Foreground="Blue"/>
+            <Label x:Name="ConnectionStateLabel" Width="500" FontWeight="Bold" Foreground="Blue"/>
         </StackPanel>
 
         <!-- Controls Row -->

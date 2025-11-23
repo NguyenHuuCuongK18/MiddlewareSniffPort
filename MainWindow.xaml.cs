@@ -605,7 +605,7 @@ namespace PacketSnifferWPF
             if (tcp.Push) flags.Add(Network_Keywords.TcpFlagPSH);
             if (tcp.Acknowledgment) flags.Add(Network_Keywords.TcpFlagACK);
             if (tcp.Urgent) flags.Add(Network_Keywords.TcpFlagURG);
-            if (tcp.ECN) flags.Add(Network_Keywords.TcpFlagECE);
+            if (tcp.ExplicitCongestionNotificationEcho) flags.Add(Network_Keywords.TcpFlagECE);
             if (tcp.CongestionWindowReduced) flags.Add(Network_Keywords.TcpFlagCWR);
 
             return flags.Count > 0 ? string.Join(", ", flags) : null;
@@ -782,8 +782,7 @@ namespace PacketSnifferWPF
             else if (tcp.Finished)
             {
                 // FIN only: Initiating connection close
-                // Determine if it's client or server based on some heuristic
-                // For simplicity, we'll use a generic message
+                // Note: Without tracking connection direction, we use a generic message
                 return UI_Keywords.StateClientDisconnecting;
             }
 
