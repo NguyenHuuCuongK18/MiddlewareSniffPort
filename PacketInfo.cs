@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace PacketSnifferWPF
+namespace MiddlewareTest
 {
     /// <summary>
     /// Represents information about a captured network packet.

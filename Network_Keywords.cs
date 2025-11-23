@@ -1,4 +1,4 @@
-namespace PacketSnifferWPF
+namespace MiddlewareTest
 {
     /// <summary>
     /// Contains all network-related string constants used throughout the application.
