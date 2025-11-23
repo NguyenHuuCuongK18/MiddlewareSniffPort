@@ -818,25 +818,33 @@ namespace PacketSnifferWPF
             {
                 ConnectionStateLabel.Content = state;
                 
-                // Change color based on state
-                if (state.Contains("Error") || state.Contains("reset") || state.Contains("RST"))
+                // Change color based on state using explicit comparisons
+                if (state == UI_Keywords.StateConnectionReset)
                 {
+                    // Red for connection reset/error
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Red;
                 }
-                else if (state.Contains("established") || state.Contains("transfer"))
+                else if (state == UI_Keywords.StateConnectionEstablished || 
+                         state == UI_Keywords.StateDataTransfer)
                 {
+                    // Green for established/active connection
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Green;
                 }
-                else if (state.Contains("closing") || state.Contains("disconnecting"))
+                else if (state == UI_Keywords.StateClientDisconnecting || 
+                         state == UI_Keywords.StateConnectionClosing)
                 {
+                    // Orange for disconnecting states
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Orange;
                 }
-                else if (state.Contains("connecting") || state.Contains("responding"))
+                else if (state == UI_Keywords.StateClientConnecting || 
+                         state == UI_Keywords.StateServerResponding)
                 {
+                    // Blue for connecting states
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Blue;
                 }
                 else
                 {
+                    // Gray for idle or unknown states
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Gray;
                 }
             });
@@ -929,14 +937,15 @@ namespace PacketSnifferWPF
             string fullHeader = $"[{timestamp}] {protocolLabel} {source} -> {destination}";
             _fullPayloadWriter.WriteLine(fullHeader);
             _fullPayloadWriter.WriteLine(decodedPayload ?? "None");
-            _fullPayloadWriter.WriteLine(new string('-', 80));
+            _fullPayloadWriter.WriteLine(new string('-', Logging_Keywords.LogSeparatorLength));
             _fullPayloadWriter.Flush();
 
             // Debug mode: Log preview to console (or add to UI if desired)
             if (_debugMode)
             {
                 string preview = decodedPayload ?? "None";
-                if (preview.Length > 1000) preview = preview.Substring(0, 1000) + " ... (truncated)";
+                if (preview.Length > Logging_Keywords.MaxDebugPreviewLength) 
+                    preview = preview.Substring(0, Logging_Keywords.MaxDebugPreviewLength) + Logging_Keywords.TruncatedSuffix;
                 Console.WriteLine($"DEBUG preview: {preview}");
             }
         }

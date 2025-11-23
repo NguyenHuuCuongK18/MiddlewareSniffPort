@@ -72,7 +72,6 @@ namespace PacketSnifferWPF
         public const string StateConnectionEstablished = "Connection established";
         public const string StateDataTransfer = "Data transfer in progress";
         public const string StateClientDisconnecting = "Client disconnecting (FIN)";
-        public const string StateServerDisconnecting = "Server disconnecting (FIN)";
         public const string StateConnectionClosing = "Connection closing (FIN-ACK)";
         public const string StateConnectionReset = "Connection reset (RST) - Error occurred";
         public const string StateUnknown = "Unknown state";
