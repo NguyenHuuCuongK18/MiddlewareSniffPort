@@ -57,6 +57,7 @@ namespace PacketSnifferWPF
 
             // Initialize connection state label
             ConnectionStateLabel.Content = UI_Keywords.StateIdle;
+            ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Gray;
 
             // Set up ports mode ComboBox
             PortsModeComboBox.ItemsSource = new List<string> { "all", "common", "targeted", "custom" };
