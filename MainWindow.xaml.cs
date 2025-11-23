@@ -32,10 +32,6 @@ namespace PacketSnifferWPF
         private StreamWriter _fullPayloadWriter;
         private CancellationTokenSource _cancellationTokenSource;
         private bool _monitorAllPorts;
-        private string _lastConnectionState = UI_Keywords.StateIdle;
-
-        // Constants
-        private const int MaxBodyDisplayLength = Logging_Keywords.MaxBodyDisplayLength;
 
         // Compiled regex patterns for better performance
         private static readonly Regex HttpRequestRegex = new Regex(
@@ -735,9 +731,9 @@ namespace PacketSnifferWPF
                 if (!string.IsNullOrWhiteSpace(body))
                 {
                     // Limit body length for display
-                    if (body.Length > MaxBodyDisplayLength)
+                    if (body.Length > Logging_Keywords.MaxBodyDisplayLength)
                     {
-                        return TruncateString(body, MaxBodyDisplayLength);
+                        return TruncateString(body, Logging_Keywords.MaxBodyDisplayLength);
                     }
                     return body;
                 }
@@ -836,8 +832,6 @@ namespace PacketSnifferWPF
         {
             if (string.IsNullOrEmpty(state))
                 return;
-
-            _lastConnectionState = state;
             
             Dispatcher.Invoke(() =>
             {
