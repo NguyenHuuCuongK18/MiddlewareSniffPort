@@ -33,9 +33,6 @@ namespace PacketSnifferWPF
         private CancellationTokenSource _cancellationTokenSource;
         private bool _monitorAllPorts;
 
-        // Constants
-        private const int MaxBodyDisplayLength = 500;
-
         // Compiled regex patterns for better performance
         private static readonly Regex HttpRequestRegex = new Regex(
             @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)",
@@ -53,6 +50,10 @@ namespace PacketSnifferWPF
             PacketsDataGrid.ItemsSource = _packets;
             _packetsView = CollectionViewSource.GetDefaultView(_packets);
             _packetsView.Filter = PacketFilter;
+
+            // Initialize connection state label
+            ConnectionStateLabel.Content = UI_Keywords.StateIdle;
+            ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Gray;
 
             // Set up ports mode ComboBox
             PortsModeComboBox.ItemsSource = new List<string> { "all", "common", "targeted", "custom" };
@@ -227,6 +228,17 @@ namespace PacketSnifferWPF
             _fullPayloadWriter?.Close();
             StartButton.IsEnabled = true;
             StopButton.IsEnabled = false;
+        }
+
+        /// <summary>
+        /// Clears all captured packets from the DataGrid when the Clear button is clicked.
+        /// </summary>
+        /// <param name="sender">The source of the event.</param>
+        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
+        private void ClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            _packets.Clear();
+            UpdateConnectionStateLabel(UI_Keywords.StateIdle);
         }
 
         /// <summary>
@@ -584,12 +596,14 @@ namespace PacketSnifferWPF
             if (tcp == null) return null;
 
             var flags = new List<string>();
-            if (tcp.Finished) flags.Add("FIN");
-            if (tcp.Synchronize) flags.Add("SYN");
-            if (tcp.Reset) flags.Add("RST");
-            if (tcp.Push) flags.Add("PSH");
-            if (tcp.Acknowledgment) flags.Add("ACK");
-            if (tcp.Urgent) flags.Add("URG");
+            if (tcp.Finished) flags.Add(Network_Keywords.TcpFlagFIN);
+            if (tcp.Synchronize) flags.Add(Network_Keywords.TcpFlagSYN);
+            if (tcp.Reset) flags.Add(Network_Keywords.TcpFlagRST);
+            if (tcp.Push) flags.Add(Network_Keywords.TcpFlagPSH);
+            if (tcp.Acknowledgment) flags.Add(Network_Keywords.TcpFlagACK);
+            if (tcp.Urgent) flags.Add(Network_Keywords.TcpFlagURG);
+            if (tcp.ExplicitCongestionNotificationEcho) flags.Add(Network_Keywords.TcpFlagECE);
+            if (tcp.CongestionWindowReduced) flags.Add(Network_Keywords.TcpFlagCWR);
 
             return flags.Count > 0 ? string.Join(", ", flags) : null;
         }
@@ -717,15 +731,142 @@ namespace PacketSnifferWPF
                 if (!string.IsNullOrWhiteSpace(body))
                 {
                     // Limit body length for display
-                    if (body.Length > MaxBodyDisplayLength)
+                    if (body.Length > Logging_Keywords.MaxBodyDisplayLength)
                     {
-                        return body.Substring(0, MaxBodyDisplayLength) + "... (truncated)";
+                        return TruncateString(body, Logging_Keywords.MaxBodyDisplayLength);
                     }
                     return body;
                 }
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Checks if the TCP packet is a pure ACK (ACK flag set without SYN, FIN, RST, or PSH).
+        /// </summary>
+        /// <param name="tcp">The TCP packet to check.</param>
+        /// <returns>True if it's a pure ACK packet, false otherwise.</returns>
+        private bool IsPureAck(TcpPacket tcp)
+        {
+            return tcp.Acknowledgment && !tcp.Synchronize && !tcp.Finished && !tcp.Reset && !tcp.Push;
+        }
+
+        /// <summary>
+        /// Truncates a string to the specified maximum length and adds a suffix.
+        /// </summary>
+        /// <param name="text">The text to truncate.</param>
+        /// <param name="maxLength">The maximum length before truncation.</param>
+        /// <returns>The truncated string with suffix, or the original string if shorter than maxLength.</returns>
+        private string TruncateString(string text, int maxLength)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+                return text;
+            
+            return text.Substring(0, maxLength) + Logging_Keywords.TruncatedSuffix;
+        }
+
+        /// <summary>
+        /// Determines the connection state based on TCP flags.
+        /// </summary>
+        /// <param name="tcp">The TCP packet.</param>
+        /// <returns>A string describing the connection state.</returns>
+        private string DetermineConnectionState(TcpPacket tcp)
+        {
+            if (tcp == null)
+                return null;
+
+            // Check for RST flag first - indicates connection reset/error
+            if (tcp.Reset)
+            {
+                return UI_Keywords.StateConnectionReset;
+            }
+
+            // Check for SYN flag combinations
+            if (tcp.Synchronize && tcp.Acknowledgment)
+            {
+                // SYN-ACK: Server responding to client's connection request
+                return UI_Keywords.StateServerResponding;
+            }
+            else if (tcp.Synchronize)
+            {
+                // SYN only: Client initiating connection
+                return UI_Keywords.StateClientConnecting;
+            }
+
+            // Check for FIN flag combinations
+            if (tcp.Finished && tcp.Acknowledgment)
+            {
+                // FIN-ACK: Acknowledging connection close
+                return UI_Keywords.StateConnectionClosing;
+            }
+            else if (tcp.Finished)
+            {
+                // FIN only: Initiating connection close
+                // Note: Without tracking connection direction, we use a generic message
+                return UI_Keywords.StateClientDisconnecting;
+            }
+
+            // Check for data transfer
+            if (tcp.Push && tcp.Acknowledgment)
+            {
+                // PSH-ACK: Data being transferred
+                return UI_Keywords.StateDataTransfer;
+            }
+
+            // Check for ACK only - connection established or acknowledging data
+            if (IsPureAck(tcp))
+            {
+                // Pure ACK: Could be connection established or acknowledging received data
+                return UI_Keywords.StateConnectionEstablished;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Updates the connection state label in the UI.
+        /// </summary>
+        /// <param name="state">The new connection state.</param>
+        private void UpdateConnectionStateLabel(string state)
+        {
+            if (string.IsNullOrEmpty(state))
+                return;
+            
+            Dispatcher.Invoke(() =>
+            {
+                ConnectionStateLabel.Content = state;
+                
+                // Change color based on state using explicit comparisons
+                if (state == UI_Keywords.StateConnectionReset)
+                {
+                    // Red for connection reset/error
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Red;
+                }
+                else if (state == UI_Keywords.StateConnectionEstablished || 
+                         state == UI_Keywords.StateDataTransfer)
+                {
+                    // Green for established/active connection
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Green;
+                }
+                else if (state == UI_Keywords.StateClientDisconnecting || 
+                         state == UI_Keywords.StateConnectionClosing)
+                {
+                    // Orange for disconnecting states
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Orange;
+                }
+                else if (state == UI_Keywords.StateClientConnecting || 
+                         state == UI_Keywords.StateServerResponding)
+                {
+                    // Blue for connecting states
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Blue;
+                }
+                else
+                {
+                    // Gray for idle or unknown states
+                    ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Gray;
+                }
+            });
         }
 
         /// <summary>
@@ -772,6 +913,13 @@ namespace PacketSnifferWPF
             // Extract TCP flags
             string tcpFlags = ExtractTcpFlags(tcpPacket);
 
+            // Determine connection state
+            string connectionState = DetermineConnectionState(tcpPacket);
+            if (!string.IsNullOrEmpty(connectionState))
+            {
+                UpdateConnectionStateLabel(connectionState);
+            }
+
             // Extract HTTP request URI and headers
             string httpRequestUri = ExtractHttpRequestUri(decodedPayload);
             string httpHeaders = ExtractHttpHeaders(decodedPayload);
@@ -790,6 +938,7 @@ namespace PacketSnifferWPF
                     CapturedData = infoPkg,
                     HasPayload = hasPayload,
                     TcpFlags = tcpFlags,
+                    ConnectionState = connectionState,
                     HttpRequestUri = httpRequestUri,
                     HttpHeaders = httpHeaders,
                     HttpBody = httpBody
@@ -807,14 +956,15 @@ namespace PacketSnifferWPF
             string fullHeader = $"[{timestamp}] {protocolLabel} {source} -> {destination}";
             _fullPayloadWriter.WriteLine(fullHeader);
             _fullPayloadWriter.WriteLine(decodedPayload ?? "None");
-            _fullPayloadWriter.WriteLine(new string('-', 80));
+            _fullPayloadWriter.WriteLine(new string('-', Logging_Keywords.LogSeparatorLength));
             _fullPayloadWriter.Flush();
 
             // Debug mode: Log preview to console (or add to UI if desired)
             if (_debugMode)
             {
                 string preview = decodedPayload ?? "None";
-                if (preview.Length > 1000) preview = preview.Substring(0, 1000) + " ... (truncated)";
+                if (preview.Length > Logging_Keywords.MaxDebugPreviewLength) 
+                    preview = TruncateString(preview, Logging_Keywords.MaxDebugPreviewLength);
                 Console.WriteLine($"DEBUG preview: {preview}");
             }
         }
