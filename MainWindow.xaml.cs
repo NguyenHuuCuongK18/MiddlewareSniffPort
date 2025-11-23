@@ -737,13 +737,37 @@ namespace PacketSnifferWPF
                     // Limit body length for display
                     if (body.Length > MaxBodyDisplayLength)
                     {
-                        return body.Substring(0, MaxBodyDisplayLength) + Logging_Keywords.TruncatedSuffix;
+                        return TruncateString(body, MaxBodyDisplayLength);
                     }
                     return body;
                 }
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Checks if the TCP packet is a pure ACK (ACK flag set without SYN, FIN, RST, or PSH).
+        /// </summary>
+        /// <param name="tcp">The TCP packet to check.</param>
+        /// <returns>True if it's a pure ACK packet, false otherwise.</returns>
+        private bool IsPureAck(TcpPacket tcp)
+        {
+            return tcp.Acknowledgment && !tcp.Synchronize && !tcp.Finished && !tcp.Reset && !tcp.Push;
+        }
+
+        /// <summary>
+        /// Truncates a string to the specified maximum length and adds a suffix.
+        /// </summary>
+        /// <param name="text">The text to truncate.</param>
+        /// <param name="maxLength">The maximum length before truncation.</param>
+        /// <returns>The truncated string with suffix, or the original string if shorter than maxLength.</returns>
+        private string TruncateString(string text, int maxLength)
+        {
+            if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+                return text;
+            
+            return text.Substring(0, maxLength) + Logging_Keywords.TruncatedSuffix;
         }
 
         /// <summary>
@@ -795,7 +819,7 @@ namespace PacketSnifferWPF
             }
 
             // Check for ACK only - connection established or acknowledging data
-            if (tcp.Acknowledgment && !tcp.Synchronize && !tcp.Finished && !tcp.Reset && !tcp.Push)
+            if (IsPureAck(tcp))
             {
                 // Pure ACK: Could be connection established or acknowledging received data
                 return UI_Keywords.StateConnectionEstablished;
@@ -946,7 +970,7 @@ namespace PacketSnifferWPF
             {
                 string preview = decodedPayload ?? "None";
                 if (preview.Length > Logging_Keywords.MaxDebugPreviewLength) 
-                    preview = preview.Substring(0, Logging_Keywords.MaxDebugPreviewLength) + Logging_Keywords.TruncatedSuffix;
+                    preview = TruncateString(preview, Logging_Keywords.MaxDebugPreviewLength);
                 Console.WriteLine($"DEBUG preview: {preview}");
             }
         }
