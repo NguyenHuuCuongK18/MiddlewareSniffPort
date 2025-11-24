@@ -60,7 +60,7 @@ namespace MiddlewareTest
 
         // Common Ports
         public static readonly int[] CommonPorts = { 80, 443, 8000, 8080, 8888 };
-        public static readonly int[] TargetedPorts = { 5000, 8080 };
+        public static readonly int[] TargetedPorts = { 8000, 8001 };
 
         // Filter Strings
         public const string FilterTCP = "tcp";

@@ -1,5 +1,6 @@
-﻿// MainWindow.xaml.cs
+// MainWindow.xaml.cs
 using MiddlewareTest;
+using MiddlewareTest.Services;
 using PacketDotNet;
 using SharpPcap;
 using System;
@@ -26,13 +27,11 @@ namespace PacketSnifferWPF
     {
         private ObservableCollection<PacketInfo> _packets = new ObservableCollection<PacketInfo>();
         private ICollectionView _packetsView; // view with filter
-        private ICaptureDevice _device;
-        private List<int> _monitoredPorts;
+        private IPacketCaptureService _packetCaptureService;
         private bool _debugMode;
-        private StreamWriter _simpleLogWriter;
-        private StreamWriter _fullPayloadWriter;
-        private CancellationTokenSource _cancellationTokenSource;
-        private bool _monitorAllPorts;
+        private StreamWriter? _simpleLogWriter;
+        private StreamWriter? _fullPayloadWriter;
+        private CancellationTokenSource? _cancellationTokenSource;
 
         // Compiled regex patterns for better performance
         private static readonly Regex HttpRequestRegex = new Regex(
@@ -46,6 +45,11 @@ namespace PacketSnifferWPF
         public MainWindow()
         {
             InitializeComponent();
+
+            // Initialize packet capture service
+            _packetCaptureService = new PacketCaptureService();
+            _packetCaptureService.PacketCaptured += OnPacketCaptured;
+            _packetCaptureService.LogMessage += OnServiceLogMessage;
 
             // set items source and build collection view for filtering
             PacketsDataGrid.ItemsSource = _packets;
@@ -164,54 +168,45 @@ namespace PacketSnifferWPF
         {
             if (InterfaceComboBox.SelectedItem == null)
             {
-                MessageBox.Show("Select an interface.");
+                MessageBox.Show(UI_Keywords.SelectInterfaceMessage);
                 return;
             }
 
             // Get ports arg from new controls
-            string portsArg = PortsModeComboBox.SelectedItem.ToString();
-            if (portsArg == "custom")
+            string portsArg = PortsModeComboBox.SelectedItem?.ToString() ?? Service_Keywords.PortsModeTargeted;
+            string? customPorts = null;
+
+            if (portsArg == Service_Keywords.PortsModeCustom)
             {
-                portsArg = CustomPortsTextBox.Text.Trim();
-                if (string.IsNullOrEmpty(portsArg))
+                customPorts = CustomPortsTextBox.Text.Trim();
+                if (string.IsNullOrEmpty(customPorts))
                 {
-                    MessageBox.Show("Enter comma-separated ports for custom mode.");
+                    MessageBox.Show(UI_Keywords.EnterCustomPortsMessage);
                     return;
                 }
-            }
-
-            // Parse ports
-            try
-            {
-                (_monitoredPorts, _monitorAllPorts) = ParsePorts(portsArg);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Invalid ports: {ex.Message}");
-                return;
             }
 
             _debugMode = DebugCheckBox.IsChecked ?? false;
             var selectedIndex = InterfaceComboBox.SelectedIndex;
             var selectedInterface = CaptureDeviceList.Instance.Where(d =>
-                d.Description.Contains("loopback", StringComparison.OrdinalIgnoreCase) ||
-                d.Name.Contains("lo", StringComparison.OrdinalIgnoreCase)).ToList()[selectedIndex]; // Retrieve based on filtered list
+                d.Description.Contains(Validation_Keywords.LoopbackKeywordLower, StringComparison.OrdinalIgnoreCase) ||
+                d.Name.Contains(Validation_Keywords.LoopbackInterfaceKeyword, StringComparison.OrdinalIgnoreCase)).ToList()[selectedIndex];
 
             // Open log files
             try
             {
                 _simpleLogWriter = new StreamWriter(LogFileTextBox.Text, true, Encoding.UTF8);
-                _fullPayloadWriter = new StreamWriter("captured_packets_full.txt", true, Encoding.UTF8);
+                _fullPayloadWriter = new StreamWriter(UI_Keywords.FullPayloadLogFile, true, Encoding.UTF8);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to open log files: {ex.Message}");
+                MessageBox.Show(string.Format(UI_Keywords.FailedToOpenLogFilesMessage, ex.Message));
                 return;
             }
 
-            // Start sniffing on background thread
+            // Start sniffing on background thread using the service
             _cancellationTokenSource = new CancellationTokenSource();
-            Task.Run(() => StartSniffing(selectedInterface, _cancellationTokenSource.Token));
+            Task.Run(() => _packetCaptureService.StartCaptureAsync(selectedInterface, portsArg, customPorts, _cancellationTokenSource.Token));
 
             StartButton.IsEnabled = false;
             StopButton.IsEnabled = true;
@@ -225,6 +220,7 @@ namespace PacketSnifferWPF
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
             _cancellationTokenSource?.Cancel();
+            _packetCaptureService.StopCapture();
             _simpleLogWriter?.Close();
             _fullPayloadWriter?.Close();
             StartButton.IsEnabled = true;
@@ -243,215 +239,31 @@ namespace PacketSnifferWPF
         }
 
         /// <summary>
-        /// Parses the ports argument to determine which ports to monitor.
+        /// Handles packet captured event from the service.
         /// </summary>
-        /// <param name="portsArg">The ports mode or custom port list.</param>
-        /// <returns>A tuple containing the list of ports and a boolean indicating if all ports are monitored.</returns>
-        /// <exception cref="ArgumentException">Thrown if the ports format is invalid.</exception>
-        private (List<int>, bool) ParsePorts(string portsArg)
+        private void OnPacketCaptured(object? sender, PacketCapturedEventArgs e)
         {
-            if (portsArg.Equals("all", StringComparison.OrdinalIgnoreCase))
-                return (null, true);
+            // Normalize protocol label with HTTP detection
+            string protocolLabel = e.ProtocolLabel;
+            var httpLabel = DetectHttpLabel(e.DecodedPayload);
+            if (!string.IsNullOrEmpty(httpLabel))
+                protocolLabel = httpLabel;
 
-            if (portsArg.Equals("common", StringComparison.OrdinalIgnoreCase))
-                return (new List<int> { 80, 443, 8000, 8080, 8888 }, false);
-
-            if (portsArg.Equals("targeted", StringComparison.OrdinalIgnoreCase))
-                return (new List<int> { 8000, 8001 }, false);
-
-            try
-            {
-                var ports = portsArg.Split(',').Select(p => int.Parse(p.Trim())).ToList();
-                return (ports, false);
-            }
-            catch
-            {
-                throw new ArgumentException("Invalid ports format. Use 'all', 'common', 'targeted', or comma-separated ints.");
-            }
+            ProcessPacket(e.SourceIp, e.SourcePort, e.DestinationIp, e.DestinationPort, 
+                         e.DecodedPayload, protocolLabel, e.Packet, e.TcpPacket);
         }
 
         /// <summary>
-        /// Starts the packet sniffing process on the specified device.
+        /// Handles log message events from the service.
         /// </summary>
-        /// <param name="device">The capture device to use.</param>
-        /// <param name="token">The cancellation token to stop sniffing.</param>
-        private void StartSniffing(ICaptureDevice device, CancellationToken token)
+        private void OnServiceLogMessage(object? sender, LogMessageEventArgs e)
         {
-            // Ensure we only attach the handler once
-            device.OnPacketArrival -= Device_OnPacketArrival;
-            device.OnPacketArrival += new PacketArrivalEventHandler(Device_OnPacketArrival);
+            _simpleLogWriter?.WriteLine(e.Message);
+            _simpleLogWriter?.Flush();
 
-            try
+            if (e.IsError)
             {
-                device.Open(DeviceModes.Promiscuous, 1000); // 1s read timeout
-            }
-            catch (Exception ex)
-            {
-                Dispatcher.Invoke(() =>
-                    MessageBox.Show($"Failed to open device: {ex.GetType().Name}: {ex.Message}")
-                );
-                try { _simpleLogWriter?.WriteLine($"[Open device error] {ex.GetType().Name}: {ex.Message}"); _simpleLogWriter?.Flush(); } catch { }
-                return;
-            }
-
-            // Build a valid BPF filter: one port token per port and include both tcp and udp.
-            string filter = "tcp or udp";
-            if (!_monitorAllPorts && _monitoredPorts != null && _monitoredPorts.Count > 0)
-            {
-                var tokens = new List<string>();
-                foreach (var p in _monitoredPorts)
-                {
-                    // Only add valid port numbers
-                    if (p > 0 && p <= 65535)
-                    {
-                        tokens.Add($"tcp port {p}");
-                        tokens.Add($"udp port {p}");
-                    }
-                }
-                if (tokens.Count > 0)
-                    filter = string.Join(" or ", tokens);
-            }
-
-            try
-            {
-                // Setting device.Filter may throw for invalid filter expressions.
-                device.Filter = filter;
-                _simpleLogWriter?.WriteLine($"[Sniffer] Applied filter: {filter}");
-                _simpleLogWriter?.Flush();
-            }
-            catch (Exception ex)
-            {
-                // If filter fails, log and continue capturing without filter so we still get traffic.
-                try
-                {
-                    _simpleLogWriter?.WriteLine($"[Filter error] {ex.GetType().Name}: {ex.Message} - continuing without filter");
-                    _simpleLogWriter?.Flush();
-                }
-                catch { }
-
-                try { device.Filter = ""; } catch { } // best effort: clear filter
-            }
-
-            try
-            {
-                device.StartCapture();
-                _simpleLogWriter?.WriteLine($"[Sniffer] Started capture on: {device.Description}");
-                _simpleLogWriter?.Flush();
-            }
-            catch (Exception ex)
-            {
-                try { _simpleLogWriter?.WriteLine($"[StartCapture error] {ex.GetType().Name}: {ex.Message}"); _simpleLogWriter?.Flush(); } catch { }
-                Dispatcher.Invoke(() =>
-                    MessageBox.Show($"Failed to start capture: {ex.Message}")
-                );
-                return;
-            }
-
-            // Loop until cancellation requested
-            try
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    Thread.Sleep(100);
-                }
-            }
-            finally
-            {
-                try
-                {
-                    device.StopCapture();
-                    device.Close();
-                    _simpleLogWriter?.WriteLine("[Sniffer] Stopped capture and closed device");
-                    _simpleLogWriter?.Flush();
-                }
-                catch (Exception ex)
-                {
-                    try { _simpleLogWriter?.WriteLine($"[Stop/Close error] {ex.GetType().Name}: {ex.Message}"); _simpleLogWriter?.Flush(); } catch { }
-                }
-            }
-        }
-
-        /// <summary>
-        /// Handles packet arrival events, parsing and processing packets.
-        /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="PacketCapture"/> instance containing the packet data.</param>
-        private void Device_OnPacketArrival(object sender, PacketCapture e)
-        {
-            try
-            {
-                var raw = e.GetPacket();
-                var packet = PacketDotNet.Packet.ParsePacket(raw.LinkLayerType, raw.Data);
-
-                // Try to parse IP layer
-                var ipPacket = packet.Extract<IPPacket>();
-                string srcIp = ipPacket?.SourceAddress?.ToString() ?? "(unknown)";
-                string dstIp = ipPacket?.DestinationAddress?.ToString() ?? "(unknown)";
-
-                // Try TCP/UDP
-                var tcp = packet.Extract<TcpPacket>();
-                var udp = packet.Extract<UdpPacket>();
-
-                int srcPort = 0, dstPort = 0;
-                string protocolLabel = "Unknown";
-                string decodedPayload = null;
-
-                if (tcp != null)
-                {
-                    srcPort = tcp.SourcePort;
-                    dstPort = tcp.DestinationPort;
-                    protocolLabel = "TCP";
-                    if (tcp.PayloadData != null && tcp.PayloadData.Length > 0)
-                    {
-                        try { decodedPayload = Encoding.UTF8.GetString(tcp.PayloadData); }
-                        catch { decodedPayload = BitConverter.ToString(tcp.PayloadData); }
-                    }
-                }
-                else if (udp != null)
-                {
-                    srcPort = udp.SourcePort;
-                    dstPort = udp.DestinationPort;
-                    protocolLabel = "UDP";
-                    if (udp.PayloadData != null && udp.PayloadData.Length > 0)
-                    {
-                        try { decodedPayload = Encoding.UTF8.GetString(udp.PayloadData); }
-                        catch { decodedPayload = BitConverter.ToString(udp.PayloadData); }
-                    }
-                }
-                else
-                {
-                    // Not TCP/UDP — ignore for now
-                    return;
-                }
-
-                // Respect monitored ports if configured
-                if (!_monitorAllPorts && _monitoredPorts != null && _monitoredPorts.Count > 0)
-                {
-                    bool match = (_monitoredPorts.Contains(srcPort) || _monitoredPorts.Contains(dstPort));
-                    if (!match) return; // not one of the ports we wanted
-                }
-
-                // Normalize protocol label further if HTTP-like data detected
-                var httpLabel = DetectHttpLabel(decodedPayload);
-                if (!string.IsNullOrEmpty(httpLabel)) protocolLabel = httpLabel;
-
-                // If both ports are zero but we have payload, still proceed
-                if (srcPort == 0 && dstPort == 0 && string.IsNullOrEmpty(decodedPayload))
-                    return;
-
-                // Now hand off to UI/logging
-                ProcessPacket(srcIp, srcPort, dstIp, dstPort, decodedPayload, protocolLabel, packet, tcp);
-            }
-            catch (Exception ex)
-            {
-                // Log any handler exception to the simple log so it's visible for debugging
-                try
-                {
-                    var msg = $"[Handler error {DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex.GetType().Name}: {ex.Message}";
-                    _simpleLogWriter?.WriteLine(msg);
-                    _simpleLogWriter?.Flush();
-                }
-                catch { }
+                Dispatcher.Invoke(() => MessageBox.Show(e.Message));
             }
         }
 
@@ -460,7 +272,7 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="payload">The packet payload to analyze.</param>
         /// <returns>An HTTP-specific label or null if not HTTP.</returns>
-        private string DetectHttpLabel(string payload)
+        private string? DetectHttpLabel(string? payload)
         {
             if (string.IsNullOrEmpty(payload)) return null;
 
@@ -509,7 +321,7 @@ namespace PacketSnifferWPF
         /// <param name="protocolLabel">The protocol label of the packet.</param>
         /// <param name="decodedPayload">The decoded packet payload.</param>
         /// <returns>A string summarizing the packet data.</returns>
-        private string GetInformationPackage(string protocolLabel, string decodedPayload)
+        private string GetInformationPackage(string protocolLabel, string? decodedPayload)
         {
             if (string.IsNullOrEmpty(decodedPayload)) return "No payload";
 
@@ -592,7 +404,7 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="tcp">The TCP packet.</param>
         /// <returns>A comma-separated string of TCP flags, or null if no flags are set.</returns>
-        private string ExtractTcpFlags(TcpPacket tcp)
+        private string? ExtractTcpFlags(TcpPacket? tcp)
         {
             if (tcp == null) return null;
 
@@ -614,7 +426,7 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="decodedPayload">The decoded packet payload.</param>
         /// <returns>The HTTP request URI or null if not found.</returns>
-        private string ExtractHttpRequestUri(string decodedPayload)
+        private string? ExtractHttpRequestUri(string? decodedPayload)
         {
             if (string.IsNullOrEmpty(decodedPayload)) return null;
 
@@ -632,7 +444,7 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="decodedPayload">The decoded packet payload.</param>
         /// <returns>True if the payload contains HTTP data, false otherwise.</returns>
-        private bool IsHttpPayload(string decodedPayload)
+        private bool IsHttpPayload(string? decodedPayload)
         {
             if (string.IsNullOrEmpty(decodedPayload)) return false;
 
@@ -644,7 +456,7 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="decodedPayload">The decoded packet payload.</param>
         /// <returns>A formatted string of HTTP headers or null if not found.</returns>
-        private string ExtractHttpHeaders(string decodedPayload)
+        private string? ExtractHttpHeaders(string? decodedPayload)
         {
             if (!IsHttpPayload(decodedPayload)) return null;
 
@@ -699,7 +511,7 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="decodedPayload">The decoded packet payload.</param>
         /// <returns>The HTTP body content or null if not found.</returns>
-        private string ExtractHttpBody(string decodedPayload)
+        private string? ExtractHttpBody(string? decodedPayload)
         {
             if (!IsHttpPayload(decodedPayload)) return null;
 
@@ -748,9 +560,9 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="tcp">The TCP packet to check.</param>
         /// <returns>True if it's a pure ACK packet, false otherwise.</returns>
-        private bool IsPureAck(TcpPacket tcp)
+        private bool IsPureAck(TcpPacket? tcp)
         {
-            return tcp.Acknowledgment && !tcp.Synchronize && !tcp.Finished && !tcp.Reset && !tcp.Push;
+            return tcp != null && tcp.Acknowledgment && !tcp.Synchronize && !tcp.Finished && !tcp.Reset && !tcp.Push;
         }
 
         /// <summary>
@@ -759,7 +571,7 @@ namespace PacketSnifferWPF
         /// <param name="text">The text to truncate.</param>
         /// <param name="maxLength">The maximum length before truncation.</param>
         /// <returns>The truncated string with suffix, or the original string if shorter than maxLength.</returns>
-        private string TruncateString(string text, int maxLength)
+        private string? TruncateString(string? text, int maxLength)
         {
             if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
                 return text;
@@ -772,7 +584,7 @@ namespace PacketSnifferWPF
         /// </summary>
         /// <param name="tcp">The TCP packet.</param>
         /// <returns>A string describing the connection state.</returns>
-        private string DetermineConnectionState(TcpPacket tcp)
+        private string? DetermineConnectionState(TcpPacket? tcp)
         {
             if (tcp == null)
                 return null;
@@ -829,7 +641,7 @@ namespace PacketSnifferWPF
         /// Updates the connection state label in the UI.
         /// </summary>
         /// <param name="state">The new connection state.</param>
-        private void UpdateConnectionStateLabel(string state)
+        private void UpdateConnectionStateLabel(string? state)
         {
             if (string.IsNullOrEmpty(state))
                 return;
@@ -881,7 +693,7 @@ namespace PacketSnifferWPF
         /// <param name="protocolLabel">Protocol label.</param>
         /// <param name="packet">The parsed packet object.</param>
         /// <param name="tcpPacket">The TCP packet (if available).</param>
-        private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string decodedPayload, string protocolLabel, PacketDotNet.Packet packet, TcpPacket tcpPacket = null)
+        private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string? decodedPayload, string protocolLabel, PacketDotNet.Packet packet, TcpPacket? tcpPacket = null)
         {
             string infoPkg = GetInformationPackage(protocolLabel, decodedPayload);
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
