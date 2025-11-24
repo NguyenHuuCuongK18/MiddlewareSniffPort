@@ -229,6 +229,7 @@ namespace MiddlewareTest
                 int srcPort = 0, dstPort = 0;
                 string protocolLabel = Network_Keywords.ProtocolUnknown;
                 string? decodedPayload = null;
+                byte[]? rawPayloadData = null;
 
                 if (tcp != null)
                 {
@@ -237,6 +238,7 @@ namespace MiddlewareTest
                     protocolLabel = Network_Keywords.ProtocolTCP;
                     if (tcp.PayloadData != null && tcp.PayloadData.Length > 0)
                     {
+                        rawPayloadData = tcp.PayloadData;
                         try { decodedPayload = Encoding.UTF8.GetString(tcp.PayloadData); }
                         catch { decodedPayload = BitConverter.ToString(tcp.PayloadData); }
                     }
@@ -248,6 +250,7 @@ namespace MiddlewareTest
                     protocolLabel = Network_Keywords.ProtocolUDP;
                     if (udp.PayloadData != null && udp.PayloadData.Length > 0)
                     {
+                        rawPayloadData = udp.PayloadData;
                         try { decodedPayload = Encoding.UTF8.GetString(udp.PayloadData); }
                         catch { decodedPayload = BitConverter.ToString(udp.PayloadData); }
                     }
@@ -284,7 +287,8 @@ namespace MiddlewareTest
                     DecodedPayload = decodedPayload,
                     ProtocolLabel = protocolLabel,
                     Packet = packet,
-                    TcpPacket = tcp
+                    TcpPacket = tcp,
+                    RawPayloadData = rawPayloadData
                 });
             }
             catch (Exception ex)

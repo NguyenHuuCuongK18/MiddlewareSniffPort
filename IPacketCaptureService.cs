@@ -50,6 +50,7 @@ namespace MiddlewareTest
         public string ProtocolLabel { get; set; } = string.Empty;
         public Packet Packet { get; set; } = null!;
         public TcpPacket? TcpPacket { get; set; }
+        public byte[]? RawPayloadData { get; set; }
     }
 
     /// <summary>

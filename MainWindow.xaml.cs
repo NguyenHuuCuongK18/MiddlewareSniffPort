@@ -249,7 +249,7 @@ namespace PacketSnifferWPF
                 protocolLabel = httpLabel;
 
             ProcessPacket(e.SourceIp, e.SourcePort, e.DestinationIp, e.DestinationPort, 
-                         e.DecodedPayload, protocolLabel, e.Packet, e.TcpPacket);
+                         e.DecodedPayload, protocolLabel, e.Packet, e.TcpPacket, e.RawPayloadData);
         }
 
         /// <summary>
@@ -692,7 +692,8 @@ namespace PacketSnifferWPF
         /// <param name="protocolLabel">Protocol label.</param>
         /// <param name="packet">The parsed packet object.</param>
         /// <param name="tcpPacket">The TCP packet (if available).</param>
-        private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string? decodedPayload, string protocolLabel, PacketDotNet.Packet packet, TcpPacket? tcpPacket = null)
+        /// <param name="rawPayloadData">Raw payload bytes (if available).</param>
+        private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string? decodedPayload, string protocolLabel, PacketDotNet.Packet packet, TcpPacket? tcpPacket = null, byte[]? rawPayloadData = null)
         {
             string infoPkg = GetInformationPackage(protocolLabel, decodedPayload);
             string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -764,10 +765,27 @@ namespace PacketSnifferWPF
             _simpleLogWriter.WriteLine(simpleLine);
             _simpleLogWriter.Flush();
 
-            // Log full payload
+            // Log full payload with raw data (no truncation)
             string fullHeader = $"[{timestamp}] {protocolLabel} {source} -> {destination}";
             _fullPayloadWriter.WriteLine(fullHeader);
+            
+            // Write decoded payload without truncation
             _fullPayloadWriter.WriteLine(decodedPayload ?? "None");
+            
+            // Write raw payload data in hex format
+            if (rawPayloadData != null && rawPayloadData.Length > 0)
+            {
+                _fullPayloadWriter.WriteLine();
+                _fullPayloadWriter.WriteLine("Raw payload (hex):");
+                
+                // Use string.Join for better memory efficiency with large payloads
+                string hexString = string.Join(" ", rawPayloadData.Select(b => b.ToString("X2")));
+                _fullPayloadWriter.WriteLine(hexString);
+                
+                _fullPayloadWriter.WriteLine();
+                _fullPayloadWriter.WriteLine($"Raw payload length: {rawPayloadData.Length} bytes");
+            }
+            
             _fullPayloadWriter.WriteLine(new string('-', Logging_Keywords.LogSeparatorLength));
             _fullPayloadWriter.Flush();
 
