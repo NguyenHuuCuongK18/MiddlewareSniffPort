@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MiddlewareTest.Services
+namespace MiddlewareTest
 {
     /// <summary>
     /// Service responsible for capturing network packets.

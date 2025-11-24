@@ -1,6 +1,5 @@
 // MainWindow.xaml.cs
 using MiddlewareTest;
-using MiddlewareTest.Services;
 using PacketDotNet;
 using SharpPcap;
 using System;

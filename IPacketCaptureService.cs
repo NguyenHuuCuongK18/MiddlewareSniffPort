@@ -4,7 +4,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace MiddlewareTest.Services
+namespace MiddlewareTest
 {
     /// <summary>
     /// Defines the contract for packet capture service.
