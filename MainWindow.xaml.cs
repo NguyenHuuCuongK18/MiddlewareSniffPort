@@ -778,7 +778,11 @@ namespace PacketSnifferWPF
             {
                 _fullPayloadWriter.WriteLine();
                 _fullPayloadWriter.WriteLine("Raw payload (hex):");
-                _fullPayloadWriter.WriteLine(BitConverter.ToString(rawPayloadData).Replace("-", " "));
+                
+                // Use string.Join for better memory efficiency with large payloads
+                string hexString = string.Join(" ", rawPayloadData.Select(b => b.ToString("X2")));
+                _fullPayloadWriter.WriteLine(hexString);
+                
                 _fullPayloadWriter.WriteLine();
                 _fullPayloadWriter.WriteLine($"Raw payload length: {rawPayloadData.Length} bytes");
             }
