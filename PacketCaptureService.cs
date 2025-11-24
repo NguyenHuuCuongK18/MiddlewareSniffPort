@@ -183,10 +183,25 @@ namespace MiddlewareTest.Services
 
             try
             {
-                var ports = portsArg.Split(',').Select(p => int.Parse(p.Trim())).ToList();
+                var ports = new List<int>();
+                foreach (var portStr in portsArg.Split(','))
+                {
+                    if (int.TryParse(portStr.Trim(), out int port))
+                    {
+                        ports.Add(port);
+                    }
+                    else
+                    {
+                        throw new ArgumentException($"'{portStr.Trim()}' is not a valid port number.");
+                    }
+                }
                 return (ports, false);
             }
-            catch
+            catch (ArgumentException)
+            {
+                throw;
+            }
+            catch (Exception)
             {
                 throw new ArgumentException(Validation_Keywords.InvalidPortsFormat);
             }
@@ -286,26 +301,48 @@ namespace MiddlewareTest.Services
             if (string.IsNullOrEmpty(payload))
                 return null;
 
-            // Check for HTTP request
-            if (payload.Contains($"{Network_Keywords.HttpMethodGET} ") ||
-                payload.Contains($"{Network_Keywords.HttpMethodPOST} ") ||
-                payload.Contains($"{Network_Keywords.HttpMethodPUT} ") ||
-                payload.Contains($"{Network_Keywords.HttpMethodDELETE} ") ||
-                payload.Contains($"{Network_Keywords.HttpMethodHEAD} ") ||
-                payload.Contains($"{Network_Keywords.HttpMethodOPTIONS} ") ||
-                payload.Contains($"{Network_Keywords.HttpMethodPATCH} ") ||
-                payload.Contains($"{Network_Keywords.HttpMethodCONNECT} "))
+            // Early check for HTTP protocol prefix (most efficient)
+            int httpIndex = payload.IndexOf(Network_Keywords.HttpProtocolPrefix, StringComparison.Ordinal);
+            if (httpIndex >= 0)
             {
-                return Network_Keywords.ProtocolHTTP;
+                // Check if it's at the start (response) or after a method (request)
+                if (httpIndex == 0 || 
+                    (httpIndex > 0 && char.IsWhiteSpace(payload[httpIndex - 1])))
+                {
+                    return Network_Keywords.ProtocolHTTP;
+                }
             }
 
-            // Check for HTTP response
-            if (payload.Contains(Network_Keywords.HttpProtocolPrefix))
+            // Check for HTTP methods at the start of payload (space-separated)
+            if (payload.Length >= 3)
             {
-                return Network_Keywords.ProtocolHTTP;
+                int spaceIndex = payload.IndexOf(' ');
+                if (spaceIndex > 0 && spaceIndex < 10)
+                {
+                    string methodCandidate = payload.Substring(0, spaceIndex);
+                    if (IsHttpMethod(methodCandidate))
+                    {
+                        return Network_Keywords.ProtocolHTTP;
+                    }
+                }
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Checks if a string is a known HTTP method.
+        /// </summary>
+        private bool IsHttpMethod(string method)
+        {
+            return method.Equals(Network_Keywords.HttpMethodGET, StringComparison.OrdinalIgnoreCase) ||
+                   method.Equals(Network_Keywords.HttpMethodPOST, StringComparison.OrdinalIgnoreCase) ||
+                   method.Equals(Network_Keywords.HttpMethodPUT, StringComparison.OrdinalIgnoreCase) ||
+                   method.Equals(Network_Keywords.HttpMethodDELETE, StringComparison.OrdinalIgnoreCase) ||
+                   method.Equals(Network_Keywords.HttpMethodHEAD, StringComparison.OrdinalIgnoreCase) ||
+                   method.Equals(Network_Keywords.HttpMethodOPTIONS, StringComparison.OrdinalIgnoreCase) ||
+                   method.Equals(Network_Keywords.HttpMethodPATCH, StringComparison.OrdinalIgnoreCase) ||
+                   method.Equals(Network_Keywords.HttpMethodCONNECT, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
