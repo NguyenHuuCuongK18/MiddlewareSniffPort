@@ -1,9 +1,0 @@
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\MiddlewareTest.exe
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\MiddlewareTest.dll
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\MiddlewareTest.deps.json
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\MiddlewareTest.runtimeconfig.json
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\MiddlewareTest.pdb
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\PacketDotNet.dll
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\SharpPcap.dll
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\System.Text.Encoding.CodePages.dll
-C:\Users\PC\Documents\School\NET\MiddlewareTest\release\runtimes\win\lib\net8.0\System.Text.Encoding.CodePages.dll
