@@ -1,4 +1,3 @@
-// MainWindow.xaml.cs
 using MiddlewareTest;
 using PacketDotNet;
 using SharpPcap;
@@ -31,6 +30,9 @@ namespace PacketSnifferWPF
         private StreamWriter? _simpleLogWriter;
         private StreamWriter? _fullPayloadWriter;
         private CancellationTokenSource? _cancellationTokenSource;
+
+        // Lock object for thread-safe file writing
+        private readonly object _fileLock = new object();
 
         // Compiled regex patterns for better performance
         private static readonly Regex HttpRequestRegex = new Regex(
@@ -75,8 +77,6 @@ namespace PacketSnifferWPF
         /// <summary>
         /// Handles changes to filter controls, refreshing the packet view.
         /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void FilterControlChanged(object sender, RoutedEventArgs e)
         {
             _packetsView?.Refresh();
@@ -85,8 +85,6 @@ namespace PacketSnifferWPF
         /// <summary>
         /// Handles changes to the protocol filter ComboBox, refreshing the packet view.
         /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="SelectionChangedEventArgs"/> instance containing the event data.</param>
         private void FilterControlChanged(object sender, SelectionChangedEventArgs e)
         {
             _packetsView?.Refresh();
@@ -95,8 +93,6 @@ namespace PacketSnifferWPF
         /// <summary>
         /// Filters packets for display based on protocol and payload settings.
         /// </summary>
-        /// <param name="obj">The packet object to evaluate.</param>
-        /// <returns>True if the packet passes the filter; otherwise, false.</returns>
         private bool PacketFilter(object obj)
         {
             if (obj is PacketInfo p)
@@ -121,8 +117,6 @@ namespace PacketSnifferWPF
         /// <summary>
         /// Handles changes to the PortsModeComboBox, enabling/disabling the custom ports input.
         /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="SelectionChangedEventArgs"/> instance containing the event data.</param>
         private void PortsModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (PortsModeComboBox.SelectedItem != null)
@@ -143,7 +137,7 @@ namespace PacketSnifferWPF
                 return;
             }
 
-            // Filter to only loopback interfaces (matches "Adapter for loopback traffic capture" or "Npcap Loopback Adapter")
+            // Filter to only loopback interfaces
             var loopbackDevices = devices.Where(d =>
                 d.Description.Contains("loopback", StringComparison.OrdinalIgnoreCase) ||
                 d.Name.Contains("lo", StringComparison.OrdinalIgnoreCase)).ToList();
@@ -155,14 +149,12 @@ namespace PacketSnifferWPF
             }
 
             InterfaceComboBox.ItemsSource = loopbackDevices.Select(d => d.Description).ToList();
-            InterfaceComboBox.SelectedIndex = 0; // Default to the first (and likely only) loopback interface
+            InterfaceComboBox.SelectedIndex = 0; // Default to the first loopback interface
         }
 
         /// <summary>
         /// Starts packet sniffing when the Start button is clicked.
         /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void StartButton_Click(object sender, RoutedEventArgs e)
         {
             if (InterfaceComboBox.SelectedItem == null)
@@ -194,6 +186,7 @@ namespace PacketSnifferWPF
             // Open log files
             try
             {
+                // Ensure directory exists if needed, mostly redundant as StreamWriter handles file creation usually
                 _simpleLogWriter = new StreamWriter(LogFileTextBox.Text, true, Encoding.UTF8);
                 _fullPayloadWriter = new StreamWriter(UI_Keywords.FullPayloadLogFile, true, Encoding.UTF8);
             }
@@ -214,14 +207,19 @@ namespace PacketSnifferWPF
         /// <summary>
         /// Stops packet sniffing and closes log files when the Stop button is clicked.
         /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void StopButton_Click(object sender, RoutedEventArgs e)
         {
             _cancellationTokenSource?.Cancel();
             _packetCaptureService.StopCapture();
-            _simpleLogWriter?.Close();
-            _fullPayloadWriter?.Close();
+
+            lock (_fileLock)
+            {
+                _simpleLogWriter?.Close();
+                _fullPayloadWriter?.Close();
+                _simpleLogWriter = null;
+                _fullPayloadWriter = null;
+            }
+
             StartButton.IsEnabled = true;
             StopButton.IsEnabled = false;
         }
@@ -229,8 +227,6 @@ namespace PacketSnifferWPF
         /// <summary>
         /// Clears all captured packets from the DataGrid when the Clear button is clicked.
         /// </summary>
-        /// <param name="sender">The source of the event.</param>
-        /// <param name="e">The <see cref="RoutedEventArgs"/> instance containing the event data.</param>
         private void ClearButton_Click(object sender, RoutedEventArgs e)
         {
             _packets.Clear();
@@ -248,8 +244,8 @@ namespace PacketSnifferWPF
             if (!string.IsNullOrEmpty(httpLabel))
                 protocolLabel = httpLabel;
 
-            ProcessPacket(e.SourceIp, e.SourcePort, e.DestinationIp, e.DestinationPort, 
-                         e.DecodedPayload, protocolLabel, e.Packet, e.TcpPacket, e.RawPayloadData);
+            ProcessPacket(e.SourceIp, e.SourcePort, e.DestinationIp, e.DestinationPort,
+                          e.DecodedPayload, protocolLabel, e.Packet, e.TcpPacket, e.RawPayloadData);
         }
 
         /// <summary>
@@ -257,95 +253,62 @@ namespace PacketSnifferWPF
         /// </summary>
         private void OnServiceLogMessage(object? sender, LogMessageEventArgs e)
         {
-            _simpleLogWriter?.WriteLine(e.Message);
-            _simpleLogWriter?.Flush();
+            // Log messages are infrequent, so basic locking is fine
+            lock (_fileLock)
+            {
+                _simpleLogWriter?.WriteLine(e.Message);
+                // We can flush service messages to ensure errors are seen immediately
+                _simpleLogWriter?.Flush();
+            }
 
             if (e.IsError)
             {
-                Dispatcher.Invoke(() => MessageBox.Show(e.Message));
+                Dispatcher.BeginInvoke(new Action(() => MessageBox.Show(e.Message)));
             }
         }
+
+        // ... (DetectHttpLabel, GetInformationPackage, IsHttpMethodLine, ExtractTcpFlags, 
+        //      ExtractHttpRequestUri, IsHttpPayload, ExtractHttpHeaders, ExtractHttpBody, 
+        //      IsPureAck, TruncateString, DetermineConnectionState methods remain unchanged)
 
         /// <summary>
         /// Detects if the payload contains HTTP data and returns an appropriate label.
         /// </summary>
-        /// <param name="payload">The packet payload to analyze.</param>
-        /// <returns>An HTTP-specific label or null if not HTTP.</returns>
         private string? DetectHttpLabel(string? payload)
         {
             if (string.IsNullOrEmpty(payload)) return null;
 
-            // Regex.Replace pattern: ^[\r\n]+
-            // ^           : Anchor at start of the string
-            // [\r\n]+    : One or more CR or LF characters (covers Windows "\r\n" or lone \n/\r) — strips leading blank lines
-            var stripped = Regex.Replace(payload, @"^[\r\n]+", ""); // Remove leading CRLF characters at the very beginning
+            var stripped = Regex.Replace(payload, @"^[\r\n]+", "");
 
-            // HTTP request line matcher pattern: \b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)
-            // \b                     : Word boundary so method starts at a boundary (avoids matching within a longer token)
-            // (GET|POST|...|CONNECT) : Capturing group #1 enumerating allowed HTTP methods
-            // \s+                    : One or more whitespace characters between method and path
-            // (\S+)                  : Capturing group #2 for the request target/path (one or more non-whitespace chars)
-            // \s+                    : One or more whitespace characters before protocol version
-            // HTTP/                   : Literal "HTTP/"
-            // ([0-9.]+)              : Capturing group #3 for version (digits and dots, e.g., 1.1)
             var reqMatch = Regex.Match(stripped, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase);
             if (reqMatch.Success)
                 return $"HTTP Request ({reqMatch.Groups[1].Value} {reqMatch.Groups[2].Value} HTTP/{reqMatch.Groups[3].Value})";
 
-            // HTTP response status line pattern: HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)
-            // HTTP/         : Literal protocol prefix
-            // ([0-9.]+)     : Capturing group #1 version (digits and dots)
-            // \s+           : One or more whitespace
-            // (\d{3})       : Capturing group #2 exactly 3 digits (status code)
-            // \s+           : One or more whitespace
-            // ([^\r\n]+)   : Capturing group #3 reason phrase (any chars up to first CR or LF)
             var respMatch = Regex.Match(stripped, @"HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)", RegexOptions.IgnoreCase);
             if (respMatch.Success)
                 return $"HTTP Response (HTTP/{respMatch.Groups[1].Value} {respMatch.Groups[2].Value} {respMatch.Groups[3].Value.Trim()})";
 
-            // Header presence heuristic pattern: (?mi)^(Host|User-Agent|Content-Type):
-            // (?mi)            : Inline flags m = multi-line (^ and $ match line boundaries), i = case-insensitive
-            // ^                : Start of a line (due to multiline)
-            // (Host|User-Agent|Content-Type) : Capturing group of header names we care about
-            // :                : Literal colon ending the header name
             if (payload.Contains("HTTP/") || Regex.IsMatch(payload, @"(?mi)^(Host|User-Agent|Content-Type):"))
                 return "HTTP (partial)";
 
             return null;
         }
 
-        /// <summary>
-        /// Extracts a summary of the packet payload for display and logging.
-        /// </summary>
-        /// <param name="protocolLabel">The protocol label of the packet.</param>
-        /// <param name="decodedPayload">The decoded packet payload.</param>
-        /// <returns>A string summarizing the packet data.</returns>
         private string GetInformationPackage(string protocolLabel, string? decodedPayload)
         {
             if (string.IsNullOrEmpty(decodedPayload)) return "No payload";
 
-            // HTTP Request same pattern explanation as above in DetectHttpLabel
-            // Pattern: \b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)
             var reqMatch = Regex.Match(decodedPayload, @"\b(GET|POST|PUT|DELETE|HEAD|OPTIONS|PATCH|CONNECT)\s+(\S+)\s+HTTP/([0-9.]+)", RegexOptions.IgnoreCase);
             if (reqMatch.Success)
             {
                 string method = reqMatch.Groups[1].Value;
                 string path = reqMatch.Groups[2].Value;
                 string version = reqMatch.Groups[3].Value;
-                // Host header pattern: (?mi)^\s*Host:\s*(.+)$
-                // (?mi)      : m = multiline (^/$ per line), i = ignore case
-                // ^          : Start of line
-                // \s*        : Optional leading whitespace before 'Host'
-                // Host:       : Literal header name + colon
-                // \s*        : Optional whitespace after colon
-                // (.+)        : Capturing group #1 greedy – the remainder of the line (host value)
-                // $          : End of line (multiline context)
                 var hostMatch = Regex.Match(decodedPayload, @"(?mi)^\s*Host:\s*(.+)$");
                 string hostFragment = hostMatch.Success ? $" Host:{hostMatch.Groups[1].Value.Trim()}" : "";
                 return $"{method} {path} HTTP/{version}{hostFragment}";
             }
 
-            // HTTP Response pattern same as in DetectHttpLabel: HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)
             var respMatch = Regex.Match(decodedPayload, @"HTTP/([0-9.]+)\s+(\d{3})\s+([^\r\n]+)", RegexOptions.IgnoreCase);
             if (respMatch.Success)
             {
@@ -355,10 +318,6 @@ namespace PacketSnifferWPF
                 return $"HTTP/{version} {status} {reason}";
             }
 
-            // First non-empty line pattern: (?m)^[^\r\n]+
-            // (?m)       : Multiline so ^ matches start of any line
-            // ^          : Start of a line
-            // [^\r\n]+  : One or more characters that are not CR or LF (captures an entire line until newline)
             var firstLineMatch = Regex.Match(decodedPayload, @"(?m)^[^\r\n]+");
             if (firstLineMatch.Success)
             {
@@ -367,7 +326,6 @@ namespace PacketSnifferWPF
                 return firstLine.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ");
             }
 
-            // Hex preview fallback
             try
             {
                 string hexPreview = BitConverter.ToString(Encoding.UTF8.GetBytes(decodedPayload)).Replace("-", "").Substring(0, Math.Min(64, decodedPayload.Length * 2));
@@ -379,15 +337,10 @@ namespace PacketSnifferWPF
             }
         }
 
-        /// <summary>
-        /// Checks if a line starts with an HTTP method.
-        /// </summary>
-        /// <param name="line">The line to check.</param>
-        /// <returns>True if the line starts with an HTTP method, false otherwise.</returns>
         private bool IsHttpMethodLine(string line)
         {
             if (string.IsNullOrEmpty(line)) return false;
-            
+
             return line.StartsWith("GET", StringComparison.OrdinalIgnoreCase) ||
                    line.StartsWith("POST", StringComparison.OrdinalIgnoreCase) ||
                    line.StartsWith("PUT", StringComparison.OrdinalIgnoreCase) ||
@@ -398,11 +351,6 @@ namespace PacketSnifferWPF
                    line.StartsWith("CONNECT", StringComparison.OrdinalIgnoreCase);
         }
 
-        /// <summary>
-        /// Extracts TCP flags from a TCP packet.
-        /// </summary>
-        /// <param name="tcp">The TCP packet.</param>
-        /// <returns>A comma-separated string of TCP flags, or null if no flags are set.</returns>
         private string? ExtractTcpFlags(TcpPacket? tcp)
         {
             if (tcp == null) return null;
@@ -420,11 +368,6 @@ namespace PacketSnifferWPF
             return flags.Count > 0 ? string.Join(", ", flags) : null;
         }
 
-        /// <summary>
-        /// Extracts HTTP request URI from the decoded payload.
-        /// </summary>
-        /// <param name="decodedPayload">The decoded packet payload.</param>
-        /// <returns>The HTTP request URI or null if not found.</returns>
         private string? ExtractHttpRequestUri(string? decodedPayload)
         {
             if (string.IsNullOrEmpty(decodedPayload)) return null;
@@ -438,28 +381,16 @@ namespace PacketSnifferWPF
             return null;
         }
 
-        /// <summary>
-        /// Checks if the payload contains HTTP protocol data.
-        /// </summary>
-        /// <param name="decodedPayload">The decoded packet payload.</param>
-        /// <returns>True if the payload contains HTTP data, false otherwise.</returns>
         private bool IsHttpPayload(string? decodedPayload)
         {
             if (string.IsNullOrEmpty(decodedPayload)) return false;
-
             return decodedPayload.Contains("HTTP/");
         }
 
-        /// <summary>
-        /// Extracts HTTP headers from the decoded payload.
-        /// </summary>
-        /// <param name="decodedPayload">The decoded packet payload.</param>
-        /// <returns>A formatted string of HTTP headers or null if not found.</returns>
         private string? ExtractHttpHeaders(string? decodedPayload)
         {
             if (!IsHttpPayload(decodedPayload)) return null;
 
-            // Extract headers (lines after the request/response line until the first empty line)
             var lines = decodedPayload.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var headers = new List<string>();
             bool inHeaders = false;
@@ -468,7 +399,6 @@ namespace PacketSnifferWPF
             {
                 if (!inHeaders)
                 {
-                    // First line is the request/response line, skip it
                     if (IsHttpMethodLine(line) || line.StartsWith("HTTP/", StringComparison.OrdinalIgnoreCase))
                     {
                         inHeaders = true;
@@ -477,72 +407,42 @@ namespace PacketSnifferWPF
                 }
                 else
                 {
-                    // Empty line marks end of headers
-                    if (string.IsNullOrWhiteSpace(line))
-                    {
-                        break;
-                    }
-
-                    // Check if line contains a colon (header format)
-                    if (line.Contains(":"))
-                    {
-                        headers.Add(line.Trim());
-                    }
+                    if (string.IsNullOrWhiteSpace(line)) break;
+                    if (line.Contains(":")) headers.Add(line.Trim());
                 }
             }
 
             if (headers.Count > 0)
             {
-                // Limit to first few headers to avoid cluttering the UI
                 var result = string.Join("; ", headers.Take(5));
-                if (headers.Count > 5)
-                {
-                    result += "...";
-                }
+                if (headers.Count > 5) result += "...";
                 return result;
             }
 
             return null;
         }
 
-        /// <summary>
-        /// Extracts HTTP body from the decoded payload.
-        /// </summary>
-        /// <param name="decodedPayload">The decoded packet payload.</param>
-        /// <returns>The HTTP body content or null if not found.</returns>
         private string? ExtractHttpBody(string? decodedPayload)
         {
             if (!IsHttpPayload(decodedPayload)) return null;
 
-            // HTTP body is separated from headers by a double CRLF (\r\n\r\n) or double LF (\n\n)
-            // Try to find the body separator
             int bodyStartIndex = -1;
-
-            // Try \r\n\r\n first (standard HTTP)
             bodyStartIndex = decodedPayload.IndexOf("\r\n\r\n");
             if (bodyStartIndex != -1)
             {
-                bodyStartIndex += 4; // Move past the separator
+                bodyStartIndex += 4;
             }
             else
             {
-                // Try \n\n (Unix-style line endings)
                 bodyStartIndex = decodedPayload.IndexOf("\n\n");
-                if (bodyStartIndex != -1)
-                {
-                    bodyStartIndex += 2; // Move past the separator
-                }
+                if (bodyStartIndex != -1) bodyStartIndex += 2;
             }
 
-            // If we found a body separator and there's content after it
             if (bodyStartIndex != -1 && bodyStartIndex < decodedPayload.Length)
             {
                 string body = decodedPayload.Substring(bodyStartIndex);
-                
-                // Trim and return only if non-empty
                 if (!string.IsNullOrWhiteSpace(body))
                 {
-                    // Limit body length for display
                     if (body.Length > Logging_Keywords.MaxBodyDisplayLength)
                     {
                         return TruncateString(body, Logging_Keywords.MaxBodyDisplayLength);
@@ -554,84 +454,34 @@ namespace PacketSnifferWPF
             return null;
         }
 
-        /// <summary>
-        /// Checks if the TCP packet is a pure ACK (ACK flag set without SYN, FIN, RST, or PSH).
-        /// </summary>
-        /// <param name="tcp">The TCP packet to check.</param>
-        /// <returns>True if it's a pure ACK packet, false otherwise.</returns>
         private bool IsPureAck(TcpPacket? tcp)
         {
             return tcp != null && tcp.Acknowledgment && !tcp.Synchronize && !tcp.Finished && !tcp.Reset && !tcp.Push;
         }
 
-        /// <summary>
-        /// Truncates a string to the specified maximum length and adds a suffix.
-        /// </summary>
-        /// <param name="text">The text to truncate.</param>
-        /// <param name="maxLength">The maximum length before truncation.</param>
-        /// <returns>The truncated string with suffix, or the original string if shorter than maxLength.</returns>
         private string? TruncateString(string? text, int maxLength)
         {
             if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
                 return text;
-            
+
             return text.Substring(0, maxLength) + Logging_Keywords.TruncatedSuffix;
         }
 
-        /// <summary>
-        /// Determines the connection state based on TCP flags.
-        /// </summary>
-        /// <param name="tcp">The TCP packet.</param>
-        /// <returns>A string describing the connection state.</returns>
         private string? DetermineConnectionState(TcpPacket? tcp)
         {
-            if (tcp == null)
-                return null;
+            if (tcp == null) return null;
 
-            // Check for RST flag first - indicates connection reset/error
-            if (tcp.Reset)
-            {
-                return UI_Keywords.StateConnectionReset;
-            }
+            if (tcp.Reset) return UI_Keywords.StateConnectionReset;
 
-            // Check for SYN flag combinations
-            if (tcp.Synchronize && tcp.Acknowledgment)
-            {
-                // SYN-ACK: Server responding to client's connection request
-                return UI_Keywords.StateServerResponding;
-            }
-            else if (tcp.Synchronize)
-            {
-                // SYN only: Client initiating connection
-                return UI_Keywords.StateClientConnecting;
-            }
+            if (tcp.Synchronize && tcp.Acknowledgment) return UI_Keywords.StateServerResponding;
+            else if (tcp.Synchronize) return UI_Keywords.StateClientConnecting;
 
-            // Check for FIN flag combinations
-            if (tcp.Finished && tcp.Acknowledgment)
-            {
-                // FIN-ACK: Acknowledging connection close
-                return UI_Keywords.StateConnectionClosing;
-            }
-            else if (tcp.Finished)
-            {
-                // FIN only: Initiating connection close
-                // Note: Without tracking connection direction, we use a generic message
-                return UI_Keywords.StateClientDisconnecting;
-            }
+            if (tcp.Finished && tcp.Acknowledgment) return UI_Keywords.StateConnectionClosing;
+            else if (tcp.Finished) return UI_Keywords.StateClientDisconnecting;
 
-            // Check for data transfer
-            if (tcp.Push && tcp.Acknowledgment)
-            {
-                // PSH-ACK: Data being transferred
-                return UI_Keywords.StateDataTransfer;
-            }
+            if (tcp.Push && tcp.Acknowledgment) return UI_Keywords.StateDataTransfer;
 
-            // Check for ACK only - connection established or acknowledging data
-            if (IsPureAck(tcp))
-            {
-                // Pure ACK: Could be connection established or acknowledging received data
-                return UI_Keywords.StateConnectionEstablished;
-            }
+            if (IsPureAck(tcp)) return UI_Keywords.StateConnectionEstablished;
 
             return null;
         }
@@ -639,60 +489,35 @@ namespace PacketSnifferWPF
         /// <summary>
         /// Updates the connection state label in the UI.
         /// </summary>
-        /// <param name="state">The new connection state.</param>
         private void UpdateConnectionStateLabel(string? state)
         {
-            if (string.IsNullOrEmpty(state))
-                return;
-            
-            Dispatcher.Invoke(() =>
+            if (string.IsNullOrEmpty(state)) return;
+
+            // Use BeginInvoke to prevent blocking
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 ConnectionStateLabel.Content = state;
-                
-                // Change color based on state using explicit comparisons
+
                 if (state == UI_Keywords.StateConnectionReset)
-                {
-                    // Red for connection reset/error
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Red;
-                }
-                else if (state == UI_Keywords.StateConnectionEstablished || 
+                else if (state == UI_Keywords.StateConnectionEstablished ||
                          state == UI_Keywords.StateDataTransfer)
-                {
-                    // Green for established/active connection
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Green;
-                }
-                else if (state == UI_Keywords.StateClientDisconnecting || 
+                else if (state == UI_Keywords.StateClientDisconnecting ||
                          state == UI_Keywords.StateConnectionClosing)
-                {
-                    // Orange for disconnecting states
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Orange;
-                }
-                else if (state == UI_Keywords.StateClientConnecting || 
+                else if (state == UI_Keywords.StateClientConnecting ||
                          state == UI_Keywords.StateServerResponding)
-                {
-                    // Blue for connecting states
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Blue;
-                }
                 else
-                {
-                    // Gray for idle or unknown states
                     ConnectionStateLabel.Foreground = System.Windows.Media.Brushes.Gray;
-                }
-            });
+            }));
         }
 
         /// <summary>
         /// Processes a captured packet, updating the UI and logs.
+        /// Refactored to use BeginInvoke and Buffered I/O to avoid packet loss.
         /// </summary>
-        /// <param name="srcIp">Source IP address.</param>
-        /// <param name="srcPort">Source port.</param>
-        /// <param name="dstIp">Destination IP address.</param>
-        /// <param name="dstPort">Destination port.</param>
-        /// <param name="decodedPayload">Decoded packet payload.</param>
-        /// <param name="protocolLabel">Protocol label.</param>
-        /// <param name="packet">The parsed packet object.</param>
-        /// <param name="tcpPacket">The TCP packet (if available).</param>
-        /// <param name="rawPayloadData">Raw payload bytes (if available).</param>
         private void ProcessPacket(string srcIp, int srcPort, string dstIp, int dstPort, string? decodedPayload, string protocolLabel, PacketDotNet.Packet packet, TcpPacket? tcpPacket = null, byte[]? rawPayloadData = null)
         {
             string infoPkg = GetInformationPackage(protocolLabel, decodedPayload);
@@ -713,7 +538,6 @@ namespace PacketSnifferWPF
                     shortProtocol = "UDP";
                 else
                 {
-                    // fallback: try contains
                     if (protocolLabel.IndexOf("tcp", StringComparison.OrdinalIgnoreCase) >= 0) shortProtocol = "TCP";
                     else if (protocolLabel.IndexOf("udp", StringComparison.OrdinalIgnoreCase) >= 0) shortProtocol = "UDP";
                     else if (protocolLabel.IndexOf("http", StringComparison.OrdinalIgnoreCase) >= 0) shortProtocol = "HTTP";
@@ -722,24 +546,20 @@ namespace PacketSnifferWPF
             }
 
             bool hasPayload = !string.IsNullOrEmpty(decodedPayload);
-
-            // Extract TCP flags
             string tcpFlags = ExtractTcpFlags(tcpPacket);
-
-            // Determine connection state
             string connectionState = DetermineConnectionState(tcpPacket);
+
             if (!string.IsNullOrEmpty(connectionState))
             {
                 UpdateConnectionStateLabel(connectionState);
             }
 
-            // Extract HTTP request URI and headers
             string httpRequestUri = ExtractHttpRequestUri(decodedPayload);
             string httpHeaders = ExtractHttpHeaders(decodedPayload);
             string httpBody = ExtractHttpBody(decodedPayload);
 
-            // Add to DataGrid (UI thread)
-            Dispatcher.Invoke(() =>
+            // Add to DataGrid (UI thread) - Asynchronous
+            Dispatcher.BeginInvoke(new Action(() =>
             {
                 _packets.Add(new PacketInfo
                 {
@@ -751,49 +571,49 @@ namespace PacketSnifferWPF
                     CapturedData = infoPkg,
                     HasPayload = hasPayload,
                     TcpFlags = tcpFlags,
-                    ConnectionState = connectionState,
-                    HttpRequestUri = httpRequestUri,
-                    HttpHeaders = httpHeaders,
-                    HttpBody = httpBody
+                    ConnectionState = connectionState ?? "",
+                    HttpRequestUri = httpRequestUri ?? "",
+                    HttpHeaders = httpHeaders ?? "",
+                    HttpBody = httpBody ?? ""
                 });
 
-                // Apply filter refresh immediately so UI updates filtered list promptly
+                // Apply filter refresh
                 _packetsView?.Refresh();
-            });
+            }));
 
-            // Log to simple file
-            _simpleLogWriter.WriteLine(simpleLine);
-            _simpleLogWriter.Flush();
-
-            // Log full payload with raw data (no truncation)
-            string fullHeader = $"[{timestamp}] {protocolLabel} {source} -> {destination}";
-            _fullPayloadWriter.WriteLine(fullHeader);
-            
-            // Write decoded payload without truncation
-            _fullPayloadWriter.WriteLine(decodedPayload ?? "None");
-            
-            // Write raw payload data in hex format
-            if (rawPayloadData != null && rawPayloadData.Length > 0)
+            // File logging inside lock, REMOVED FLUSH calls for performance
+            lock (_fileLock)
             {
-                _fullPayloadWriter.WriteLine();
-                _fullPayloadWriter.WriteLine("Raw payload (hex):");
-                
-                // Use string.Join for better memory efficiency with large payloads
-                string hexString = string.Join(" ", rawPayloadData.Select(b => b.ToString("X2")));
-                _fullPayloadWriter.WriteLine(hexString);
-                
-                _fullPayloadWriter.WriteLine();
-                _fullPayloadWriter.WriteLine($"Raw payload length: {rawPayloadData.Length} bytes");
-            }
-            
-            _fullPayloadWriter.WriteLine(new string('-', Logging_Keywords.LogSeparatorLength));
-            _fullPayloadWriter.Flush();
+                if (_simpleLogWriter != null)
+                {
+                    _simpleLogWriter.WriteLine(simpleLine);
+                }
 
-            // Debug mode: Log preview to console (or add to UI if desired)
+                if (_fullPayloadWriter != null)
+                {
+                    string fullHeader = $"[{timestamp}] {protocolLabel} {source} -> {destination}";
+                    _fullPayloadWriter.WriteLine(fullHeader);
+                    _fullPayloadWriter.WriteLine(decodedPayload ?? "None");
+
+                    if (rawPayloadData != null && rawPayloadData.Length > 0)
+                    {
+                        _fullPayloadWriter.WriteLine();
+                        _fullPayloadWriter.WriteLine("Raw payload (hex):");
+                        string hexString = string.Join(" ", rawPayloadData.Select(b => b.ToString("X2")));
+                        _fullPayloadWriter.WriteLine(hexString);
+                        _fullPayloadWriter.WriteLine();
+                        _fullPayloadWriter.WriteLine($"Raw payload length: {rawPayloadData.Length} bytes");
+                    }
+
+                    _fullPayloadWriter.WriteLine(new string('-', Logging_Keywords.LogSeparatorLength));
+                }
+            }
+
+            // Debug mode: Log preview to console
             if (_debugMode)
             {
                 string preview = decodedPayload ?? "None";
-                if (preview.Length > Logging_Keywords.MaxDebugPreviewLength) 
+                if (preview.Length > Logging_Keywords.MaxDebugPreviewLength)
                     preview = TruncateString(preview, Logging_Keywords.MaxDebugPreviewLength);
                 Console.WriteLine($"DEBUG preview: {preview}");
             }
